@@ -172,3 +172,25 @@ Executado sobre o snapshot reenviado:
 **Fase 1 encerrada:** os contratos públicos relevantes para a TUI foram mapeados a partir do snapshot correto, as operações e efeitos colaterais estão documentados, e os riscos de terminal/segredos foram convertidos em requisitos de implementação.
 
 Não foram implementadas operações novas da TUI nesta fase. A próxima fase deve começar pela revisão da TUI atual e pelos testes de mock, depois seguir com `insert` e `edit`. O GitHub público do npass continua sendo referência histórica/secundária enquanto estiver divergente do ZIP fornecido.
+
+
+## 10. Fase 2: criação e edição na TUI
+
+Status: **implementada no código; validação automatizada limitada à sintaxe até execução do CI**.
+
+Commit de implementação: `911275955c754e5ac814fa0821454e05ed1cba75` (seguido de correção de sanitização em `00f1ad923022857c378c132ad5839560c4bc3328`).
+
+- `a` na lista de entradas solicita um caminho lógico e chama `npass insert ID CAMINHO` sem `-f`. Caminho vazio cancela sem invocar a CLI.
+- A própria CLI continua responsável por solicitar a senha duas vezes sem eco e confirmar sobrescrita. A TUI não recebe nem armazena a senha.
+- `e` na lista de entradas chama `npass edit ID CAMINHO` e delega a edição ao `$EDITOR` configurado no ambiente.
+- Antes de invocar os comandos interativos, a TUI restaura o estado original do terminal e mostra o cursor. Depois, ativa novamente o modo raw, recarrega os caminhos e redesenha a interface.
+- Foi adicionada sanitização de sequências de controle ANSI/OSC e caracteres de controle na saída renderizada. O caminho original continua sendo passado à CLI sem transformação.
+- O README documenta os novos atalhos.
+
+Limitações ainda abertas:
+- A validação manual com cofre real e editor interativo não foi executada nesta etapa.
+- A suíte Bats do npass não foi executada e não é uma suíte da TUI.
+- O CI atual verifica `bash -n npass-tui`; isso não prova os fluxos interativos, confirmação de sobrescrita ou restauração do terminal em todos os terminais.
+- A ação `e` edita uma entrada selecionada na lista; não há ainda um fluxo separado de “criar documento completo” nem operações de exclusão/movimentação.
+
+A próxima etapa deve acrescentar testes de integração com um `npass` simulado e um pseudo-terminal, verificando em particular cancelamento, ausência de `-f`, estado do terminal e retorno após falha do editor.
