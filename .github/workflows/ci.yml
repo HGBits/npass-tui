@@ -18,8 +18,7 @@ jobs:
         run: |
           bash -n npass-tui
           bash -n tests/test_helper.bash
-          for test_file in tests/*.bats; do
-            bash -n "$test_file"
-          done
+      - name: Validate Bats test files
+        run: bats --count tests/*.bats
       - name: Run Bats tests
         run: bats tests/*.bats
