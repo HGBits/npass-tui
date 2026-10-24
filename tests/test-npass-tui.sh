@@ -49,7 +49,7 @@ run_tui() {
       *) echo "unknown test scenario: $scenario" >&2; return 2 ;;
     esac
   } | TERM=xterm NPASS_BIN="$MOCK_NPASS" NPASS_LOG="$LOG" \
-    script -qefc "env TERM=xterm NPASS_BIN='$MOCK_NPASS' NPASS_LOG='$LOG' '$ROOT/npass-tui'" /dev/null \
+    script -qefc "env TERM=xterm NPASS_BIN='$MOCK_NPASS' NPASS_LOG='$LOG' bash '$ROOT/npass-tui'" /dev/null \
     >/dev/null 2>&1
 }
 
