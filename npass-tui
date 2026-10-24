@@ -1,182 +1,159 @@
-#!/usr/bin/env python3
-"""Thin curses interface for npass. All secret/store operations stay in npass."""
-import curses
-import os
-import subprocess
-import sys
-import textwrap
+#!/usr/bin/env bash
+# Thin Bash/dialog interface for npass. Secret handling remains in npass.
+set -uo pipefail
 
+NPASS_BIN="${NPASS_BIN:-npass}"
+DIALOG_BIN="${DIALOG_BIN:-dialog}"
+APP_NAME="npass-tui"
 
-def run_npass(args, *, timeout=60):
-    try:
-        p = subprocess.run([os.environ.get('NPASS_BIN', 'npass'), *args],
-                           text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                           timeout=timeout, check=False)
-    except FileNotFoundError:
-        raise RuntimeError('npass não encontrado. Instale-o ou defina NPASS_BIN.')
-    except subprocess.TimeoutExpired:
-        raise RuntimeError('npass demorou demais para responder.')
-    if p.returncode:
-        raise RuntimeError((p.stderr or p.stdout or f'npass saiu com código {p.returncode}').strip())
-    return p.stdout
+die() {
+    printf '%s: %s\n' "$APP_NAME" "$*" >&2
+    exit 1
+}
 
+have() { command -v "$1" >/dev/null 2>&1; }
 
-def identities():
-    out = run_npass(['identities'])
-    result = []
-    for line in out.splitlines():
-        # Output format is localized, so retain the left-hand label when possible.
-        ident = line.split(' - ', 1)[0].strip()
-        if ident and not ident.startswith(('Nenhuma', 'No ')):
-            result.append(ident)
-    if not result:
-        raise RuntimeError('Nenhuma identidade encontrada.')
-    return result
+npass() {
+    "$NPASS_BIN" "$@"
+}
 
+ui_error() {
+    "$DIALOG_BIN" --title "$APP_NAME - erro" --msgbox "$1" 8 68
+}
 
-def draw(stdscr, title, rows, selected, status, query=''):
-    stdscr.erase()
-    h, w = stdscr.getmaxyx()
-    if h < 8 or w < 40:
-        stdscr.addstr(0, 0, 'Terminal pequeno demais (mínimo 40x8).')
-        stdscr.refresh()
-        return
-    stdscr.attron(curses.color_pair(1) | curses.A_BOLD)
-    stdscr.addnstr(0, 0, f' npass-tui  /  {title} ', w - 1)
-    stdscr.attroff(curses.color_pair(1) | curses.A_BOLD)
-    stdscr.addnstr(1, 1, f'Filtro: {query or "(nenhum)"}', w - 2)
-    visible = rows
-    top = max(0, min(selected - (h - 7), max(0, len(visible) - (h - 5))))
-    for y, item in enumerate(visible[top:top + h - 5], start=3):
-        idx = top + y - 3
-        if idx == selected:
-            stdscr.attron(curses.color_pair(2) | curses.A_BOLD)
-            stdscr.addnstr(y, 1, '> ' + item, w - 2)
-            stdscr.attroff(curses.color_pair(2) | curses.A_BOLD)
-        else:
-            stdscr.addnstr(y, 1, '  ' + item, w - 2)
-    stdscr.attron(curses.A_DIM)
-    stdscr.addnstr(h - 2, 1, status, w - 2)
-    stdscr.addnstr(h - 1, 1, '↑/↓ navegar  Enter abrir  / filtrar  c copiar senha  o OTP  Esc voltar  q sair', w - 2)
-    stdscr.attroff(curses.A_DIM)
-    stdscr.refresh()
+ui_info() {
+    "$DIALOG_BIN" --title "$APP_NAME" --msgbox "$1" 8 68
+}
 
+menu() {
+    local title=$1 prompt=$2 height=$3 width=$4 list_height=$5
+    shift 5
+    "$DIALOG_BIN" --stdout --clear --title "$title" \
+        --menu "$prompt" "$height" "$width" "$list_height" "$@"
+}
 
-def message(stdscr, msg):
-    h, w = stdscr.getmaxyx()
-    lines = []
-    for raw in str(msg).splitlines() or ['']:
-        lines.extend(textwrap.wrap(raw, max(10, w - 4)) or [''])
-    stdscr.erase()
-    stdscr.addnstr(0, 0, ' npass-tui ', w - 1, curses.A_REVERSE)
-    for i, line in enumerate(lines[:h - 3], 2):
-        stdscr.addnstr(i, 2, line, w - 4)
-    stdscr.addnstr(h - 1, 0, 'Pressione qualquer tecla para continuar', w - 1, curses.A_DIM)
-    stdscr.refresh()
-    stdscr.getch()
-
-
-def read_entry(stdscr, ident, path):
-    raw = run_npass(['show', '--raw', ident, path])
-    h, w = stdscr.getmaxyx()
-    lines = raw.splitlines()
-    offset = 0
-    while True:
-        stdscr.erase()
-        stdscr.attron(curses.color_pair(1) | curses.A_BOLD)
-        stdscr.addnstr(0, 0, f' {ident}/{path} ', w - 1)
-        stdscr.attroff(curses.color_pair(1) | curses.A_BOLD)
-        for i, line in enumerate(lines[offset:offset + h - 3], 1):
-            # Raw secrets are displayed exactly as returned; do not write them to disk.
-            stdscr.addnstr(i, 1, line, w - 2)
-        stdscr.addnstr(h - 1, 0, '↑/↓ rolar  c copiar senha  o OTP  Esc voltar', w - 1, curses.A_DIM)
-        stdscr.refresh()
-        key = stdscr.getch()
-        if key in (27, ord('q'), ord('Q')):
-            return
-        if key in (curses.KEY_DOWN, ord('j')):
-            offset = min(max(0, len(lines) - h + 3), offset + 1)
-        elif key in (curses.KEY_UP, ord('k')):
-            offset = max(0, offset - 1)
-        elif key == ord('c'):
-            message(stdscr, run_npass(['clip', ident, path]) or 'Senha enviada ao clipboard pelo npass.')
-        elif key == ord('o'):
-            message(stdscr, run_npass(['otp', ident, path]) or 'Comando OTP concluído.')
-
-
-def app(stdscr):
-    curses.curs_set(0)
-    curses.start_color()
-    curses.use_default_colors()
-    curses.init_pair(1, curses.COLOR_CYAN, -1)
-    curses.init_pair(2, curses.COLOR_BLACK, curses.COLOR_CYAN)
-    try:
-        ids = identities()
-    except RuntimeError as exc:
-        message(stdscr, exc)
-        return
-    id_idx, path_idx, ident, paths, query, status = 0, 0, ids[0], [], '', 'Escolha uma identidade.'
-    mode = 'identities'
-    while True:
-        if mode == 'identities':
-            rows = ids
-            selected = id_idx
-            title = 'Identidades'
-        else:
-            filtered = [p for p in paths if query.casefold() in p.casefold()]
-            rows = filtered or (['(nenhuma entrada corresponde ao filtro)'] if query else ['(identidade vazia)'])
-            selected = min(path_idx, len(rows) - 1)
-            title = ident
-        draw(stdscr, title, rows, selected, status, query if mode == 'entries' else '')
-        key = stdscr.getch()
-        if key in (ord('q'), ord('Q')):
-            if mode == 'entries':
-                mode, query, status = 'identities', '', 'Escolha uma identidade.'
-                continue
-            return
-        if key in (curses.KEY_UP, ord('k')):
-            if mode == 'identities': id_idx = max(0, id_idx - 1)
-            else: path_idx = max(0, path_idx - 1)
-        elif key in (curses.KEY_DOWN, ord('j')):
-            if mode == 'identities': id_idx = min(len(ids) - 1, id_idx + 1)
-            else: path_idx = min(max(0, len([p for p in paths if query.casefold() in p.casefold()]) - 1), path_idx + 1)
-        elif key in (10, 13, curses.KEY_ENTER):
-            try:
-                if mode == 'identities':
-                    ident = ids[id_idx]
-                    paths = run_npass(['tree', '--flat', ident]).splitlines()
-                    path_idx, query, mode = 0, '', 'entries'
-                    status = f'{len(paths)} caminhos. A listagem não decifra as entradas.'
-                else:
-                    if rows and not rows[0].startswith('('): read_entry(stdscr, ident, rows[selected])
-            except RuntimeError as exc:
-                message(stdscr, exc)
-        elif key == 27 and mode == 'entries':
-            mode, query, status = 'identities', '', 'Escolha uma identidade.'
-        elif key == ord('/') and mode == 'entries':
-            curses.echo()
-            curses.curs_set(1)
-            stdscr.addstr(stdscr.getmaxyx()[0] - 2, 0, 'Filtro: ')
-            query = stdscr.getstr(stdscr.getmaxyx()[0] - 2, 8, 200).decode('utf-8', 'replace')
-            curses.noecho(); curses.curs_set(0); path_idx = 0
-        elif key == ord('c') and mode == 'entries':
-            try:
-                if rows and not rows[0].startswith('('):
-                    message(stdscr, run_npass(['clip', ident, rows[selected]]) or 'Senha enviada ao clipboard pelo npass.')
-            except RuntimeError as exc: message(stdscr, exc)
-        elif key == ord('o') and mode == 'entries':
-            try:
-                if rows and not rows[0].startswith('('): message(stdscr, run_npass(['otp', ident, rows[selected]]) or 'Comando OTP concluído.')
-            except RuntimeError as exc: message(stdscr, exc)
-
-
-def main():
-    try:
-        curses.wrapper(app)
-    except RuntimeError as exc:
-        print(f'npass-tui: {exc}', file=sys.stderr)
+get_identities() {
+    local output line ident
+    output=$(npass identities 2>&1) || {
+        ui_error "Não foi possível listar identidades.\n\n$output"
         return 1
-    return 0
+    }
+    IDENTITIES=()
+    while IFS= read -r line; do
+        # npass prints: IDENTITY - N senhas. Keep the identity label intact.
+        ident=$(printf '%s\n' "$line" | sed -E 's/[[:space:]]+-[[:space:]]+[0-9]+[[:space:]].*$//')
+        ident=${ident#" ${ident%%[![:space:]]*}"}
+        [[ -n $ident ]] && IDENTITIES+=("$ident")
+    done <<< "$output"
+    (("${#IDENTITIES[@]}" > 0)) || {
+        ui_error "Nenhuma identidade encontrada."
+        return 1
+    }
+}
 
-if __name__ == '__main__':
-    raise SystemExit(main())
+get_paths() {
+    local output
+    output=$(npass tree --flat "$1" 2>&1) || {
+        ui_error "Não foi possível listar as entradas.\n\n$output"
+        return 1
+    }
+    PATHS=()
+    while IFS= read -r line; do
+        [[ -n $line ]] && PATHS+=("$line")
+    done <<< "$output"
+}
+
+show_entry() {
+    local ident=$1 path=$2 content
+    content=$(npass show --raw "$ident" "$path" 2>&1) || {
+        ui_error "Não foi possível abrir a entrada.\n\n$content"
+        return
+    }
+    # Do not write secret contents to temporary files.
+    "$DIALOG_BIN" --title "$ident / $path" --no-collapse --msgbox "$content" 22 76
+}
+
+copy_password() {
+    local ident=$1 path=$2 output
+    output=$(npass clip "$ident" "$path" 2>&1) || {
+        ui_error "Falha ao copiar a senha.\n\n$output"
+        return
+    }
+    ui_info "Comando npass clip concluído. A senha foi enviada ao clipboard pelo npass."
+}
+
+show_otp() {
+    local ident=$1 path=$2 output
+    output=$(npass otp "$ident" "$path" 2>&1) || {
+        ui_error "Não foi possível obter o OTP.\n\n$output"
+        return
+    }
+    ui_info "OTP para $path:\n\n$output"
+}
+
+entries_screen() {
+    local ident=$1 query="" selected="" path action filtered=() args=() p
+    while :; do
+        get_paths "$ident" || return
+        filtered=()
+        if [[ -n $query ]]; then
+            for p in "${PATHS[@]}"; do
+                [[ $p == *"$query"* ]] && filtered+=("$p")
+            done
+        else
+            filtered=("${PATHS[@]}")
+        fi
+        if (("${#filtered[@]}" == 0)); then
+            if [[ -n $query ]]; then
+                ui_info "Nenhuma entrada corresponde ao filtro: $query"
+            else
+                ui_info "Esta identidade não contém entradas."
+                return
+            fi
+            query=""
+            continue
+        fi
+
+        args=()
+        for p in "${filtered[@]}"; do args+=("$p" ""); done
+        selected=$(menu "$ident" "Selecione uma entrada. Filtro: ${query:-nenhum}" 22 78 14 "${args[@]}") || return
+        [[ -n $selected ]] || return
+
+        action=$(menu "$selected" "Ação para esta entrada" 15 64 5 \
+            "Abrir" "Visualizar conteúdo" \
+            "Copiar" "Copiar senha via npass" \
+            "OTP" "Consultar código OTP" \
+            "Filtrar" "Filtrar caminhos" \
+            "Voltar" "Voltar à lista") || continue
+        case $action in
+            Abrir) show_entry "$ident" "$selected" ;;
+            Copiar) copy_password "$ident" "$selected" ;;
+            OTP) show_otp "$ident" "$selected" ;;
+            Filtrar)
+                query=$("$DIALOG_BIN" --stdout --title "Filtrar entradas" \
+                    --inputbox "Trecho do caminho (vazio remove o filtro)" 10 68 "$query") || query=""
+                ;;
+            Voltar) ;;
+        esac
+    done
+}
+
+main() {
+    have "$DIALOG_BIN" || die "Dependência ausente: dialog. Instale dialog e tente novamente."
+    have "$NPASS_BIN" || die "npass não encontrado. Instale-o ou defina NPASS_BIN=/caminho/para/npass."
+    have sed || die "Dependência ausente: sed."
+
+    get_identities || return 1
+    local ident
+    while :; do
+        local args=()
+        for ident in "${IDENTITIES[@]}"; do args+=("$ident" ""); done
+        ident=$(menu "npass-tui" "Selecione uma identidade" 20 72 12 "${args[@]}") || break
+        [[ -n $ident ]] || break
+        entries_screen "$ident"
+    done
+    "$DIALOG_BIN" --clear --title "$APP_NAME" --infobox "Até a próxima." 3 24
+    sleep 0.4
+}
+
+main "$@"
