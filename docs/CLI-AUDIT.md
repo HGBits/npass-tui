@@ -162,7 +162,8 @@ Executado sobre o snapshot reenviado:
 - `bash -n lib/*.bash` passou.
 - `bash -n build.sh install.sh extensions/npass-import extensions/npass-audit` passou.
 - O build passou com `bash build.sh`, gerando `bin/npass` no diretório temporário de auditoria.
-- O comando `bats` não está instalado neste ambiente; por isso a suíte Bats **não foi executada**. Não declarar a suíte aprovada.
+- Smoke tests do binário gerado: `npass help` e `npass tree --help` retornaram 0; `npass show --help` retornou 1 com `opção desconhecida`, confirmando que `show` não oferece `--help` próprio neste snapshot.
+- O comando `bats` não está instalado neste ambiente; por isso a suíte de 27 arquivos Bats **não foi executada**. Não declarar a suíte aprovada.
 - Não houve integração interativa com um cofre real nem teste em terminal PTY nesta fase.
 - O ZIP declara versão 2.5 no README, mas não fornece uma referência Git imutável (commit/hash) que permita identificar seu commit de origem. Esta nota documenta o snapshot enviado, não uma afirmação de que o branch público atual seja idêntico.
 
