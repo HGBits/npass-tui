@@ -7,11 +7,13 @@ load test_helper
   assert_log_has 'identities'
   assert_log_has 'tree --flat personal'
   assert_log_has 'insert personal new/site'
-  ! grep -Eq '^insert .* (-f|--force)( |$)' "$LOG"
+  run grep -Eq '^insert .* (-f|--force)( |$)' "$LOG"
+  [ "$status" -ne 0 ]
 }
 
 @test "caminho vazio cancela a criação" {
   run run_tui cancel
   [ "$status" -eq 0 ]
-  ! grep -Eq '^insert ' "$LOG"
+  run grep -Eq '^insert ' "$LOG"
+  [ "$status" -ne 0 ]
 }
