@@ -11,4 +11,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Check Bash syntax
-        run: bash -n npass-tui
+        run: |
+          bash -n npass-tui
+          bash -n tests/test-npass-tui.sh
+      - name: Run mock CLI PTY smoke tests
+        run: bash tests/test-npass-tui.sh
