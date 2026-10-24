@@ -28,9 +28,27 @@ if ! command -v script >/dev/null 2>&1; then
 fi
 
 run_tui() {
-  local keys=$1
+  local scenario=$1
   : >"$LOG"
-  printf '%s' "$keys" | TERM=xterm NPASS_BIN="$MOCK_NPASS" NPASS_LOG="$LOG" \
+  {
+    case "$scenario" in
+      create)
+        printf '\\r'; sleep 0.15
+        printf 'a'; sleep 0.15
+        printf 'new/site\\n'; sleep 0.15
+        printf 'q' ;;
+      edit)
+        printf '\\r'; sleep 0.15
+        printf 'e'; sleep 0.15
+        printf 'q' ;;
+      cancel)
+        printf '\\r'; sleep 0.15
+        printf 'a'; sleep 0.15
+        printf '\\n'; sleep 0.15
+        printf 'q' ;;
+      *) echo "unknown test scenario: $scenario" >&2; return 2 ;;
+    esac
+  } | TERM=xterm NPASS_BIN="$MOCK_NPASS" NPASS_LOG="$LOG" \
     script -qefc "env TERM=xterm NPASS_BIN='$MOCK_NPASS' NPASS_LOG='$LOG' '$ROOT/npass-tui'" /dev/null \
     >/dev/null 2>&1
 }
