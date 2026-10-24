@@ -194,3 +194,19 @@ Limitações ainda abertas:
 - A ação `e` edita uma entrada selecionada na lista; não há ainda um fluxo separado de “criar documento completo” nem operações de exclusão/movimentação.
 
 A próxima etapa deve acrescentar testes de integração com um `npass` simulado e um pseudo-terminal, verificando em particular cancelamento, ausência de `-f`, estado do terminal e retorno após falha do editor.
+
+
+## 11. Fase 3: testes automatizados com CLI simulada
+
+Status: **testes adicionados; aguardando confirmação do CI**.
+
+- Corrigido o arquivo `npass-tui`, que continha um trecho corrompido e uma cópia duplicada do código após a chamada final de `main_loop`. O arquivo agora termina na chamada válida.
+- Criado `tests/test-npass-tui.sh`, que usa um executável `npass` simulado e `script(1)` para exercitar a TUI em pseudo-terminal.
+- Os cenários verificam: navegação até a lista, criação com caminho informado, edição da entrada selecionada e cancelamento de criação com caminho vazio.
+- O teste registra os argumentos recebidos pelo mock e confirma que criação não usa `-f` nem `--force`.
+- O workflow de CI agora valida a sintaxe do script principal e do teste, depois executa os cenários de pseudo-terminal.
+
+Limitações:
+- Os testes usam um mock, não abrem um cofre real e não validam criptografia, GPG, clipboard ou o comportamento interno de `npass`.
+- Ainda é necessário confirmar o resultado do workflow após o push. Não considerar a fase validada apenas porque o teste foi adicionado.
+- A próxima implementação funcional prevista continua sendo exclusão com confirmação explícita e aviso sobre anexos de backup, mas só depois de corrigir eventuais falhas apontadas pelo CI.
