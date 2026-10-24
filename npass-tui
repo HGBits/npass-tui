@@ -139,7 +139,7 @@ header() {
     printf '%s%s' "$CYAN" "$BOLD"
     put 0 0 " npass-tui  /  ${CURRENT_ID:-identidades}" "$COLS"
     printf '%s' "$RESET"
-    put 1 0 "$(printf '%*s' "$COLS" '' | tr ' ' '─')" "$COLS"
+    put 1 0 "$(printf '%*s' "$COLS" '' | tr ' ' '-')" "$COLS"
 }
 
 footer() {
