@@ -34,18 +34,18 @@ run_tui() {
   {
     case "$scenario" in
       create)
-        printf '\\r'; sleep 0.15
+        printf '\r'; sleep 0.15
         printf 'a'; sleep 0.15
-        printf 'new/site\\n'; sleep 0.15
+        printf 'new/site\n'; sleep 0.15
         printf 'q' ;;
       edit)
-        printf '\\r'; sleep 0.15
+        printf '\r'; sleep 0.15
         printf 'e'; sleep 0.15
         printf 'q' ;;
       cancel)
-        printf '\\r'; sleep 0.15
+        printf '\r'; sleep 0.15
         printf 'a'; sleep 0.15
-        printf '\\n'; sleep 0.15
+        printf '\n'; sleep 0.15
         printf 'q' ;;
       *) echo "unknown test scenario: $scenario" >&2; return 2 ;;
     esac
