@@ -1,13 +1,15 @@
 # npass-tui
 
-Interface de terminal em **Bash** para o [`npass`](https://github.com/HGBits/npass). O npass é uma dependência obrigatória e continua sendo a única camada responsável por armazenamento, descriptografia e operações com segredos. A TUI apenas apresenta as identidades e os caminhos e encaminha comandos.
+Interface de terminal em **Bash** para o [`npass`](https://github.com/HGBits/npass). A TUI é uma camada de apresentação: armazenamento, criptografia, descriptografia, clipboard e OTP continuam sendo responsabilidade do `npass`.
 
 ## Requisitos
 
-- Bash 4+
-- [`dialog`](https://invisible-island.net/dialog/) para os menus de terminal
+- Bash 4.3+
+- `tput` e `stty` (normalmente fornecidos por ncurses/coreutils/util-linux, conforme a distribuição)
 - `npass` instalado e configurado conforme a documentação do projeto
-- `sed`
+- Terminal interativo com suporte a terminfo
+
+Não depende de Python, `dialog`, `fzf` ou `gum`.
 
 ## Executar
 
@@ -16,27 +18,30 @@ chmod +x npass-tui
 ./npass-tui
 ```
 
-Se `npass` não estiver no `PATH`, informe o caminho do executável:
+Se `npass` não estiver no `PATH`, informe o caminho:
 
 ```sh
 NPASS_BIN="$HOME/.local/bin/npass" ./npass-tui
 ```
 
-Também é possível selecionar outro executável de `dialog` com `DIALOG_BIN`.
-
 ## Controles
 
-A navegação é feita pelos menus do `dialog`. Selecione uma identidade e depois um caminho para abrir o menu de ações:
+- `↑` / `↓` ou `j` / `k`: navegar
+- `Enter`: abrir identidade ou visualizar entrada
+- `/`: filtrar caminhos; filtro vazio mostra tudo
+- `c`: copiar senha via `npass clip`
+- `o`: consultar OTP via `npass otp`
+- `Esc`: voltar
+- `q`: voltar ou sair
 
-- **Abrir**: visualiza o conteúdo retornado por `npass show --raw`
-- **Copiar**: delega a cópia a `npass clip`
-- **OTP**: delega a consulta a `npass otp`
-- **Filtrar**: filtra caminhos por um trecho de texto
+## Segurança e escopo
 
-## Decisões de segurança
+- Identidades são obtidas por `npass identities`; caminhos por `npass tree --flat ID`.
+- O conteúdo é obtido apenas quando solicitado, via `npass show --raw ID CAMINHO`.
+- A TUI não grava segredos em arquivos temporários nem implementa o formato de armazenamento do npass.
+- A primeira versão é somente leitura, além de copiar senha e consultar OTP. Criação, edição e exclusão ficam para uma etapa posterior, usando apenas comandos suportados pelo próprio `npass`.
+- O conteúdo exibido fica na memória do processo e pode ser capturado por gravação de terminal ou visto por alguém com acesso à tela. Use em uma sessão confiável.
 
-- A lista de identidades vem de `npass identities`; os caminhos vêm de `npass tree --flat`.
-- A TUI não implementa armazenamento, criptografia, descriptografia nem o formato md1.
-- Senhas não são gravadas em arquivos temporários. O conteúdo de uma entrada é mantido em memória pelo shell e exibido pelo `dialog`.
-- A primeira versão é somente leitura, além de copiar senha e consultar OTP. Criar, editar e excluir entradas ficam a cargo de futuras operações suportadas pelo próprio `npass`.
-- Use em um terminal confiável. A visualização de segredos pode ficar exposta a pessoas próximas ou ao histórico de gravação do terminal.
+## Estado
+
+Versão inicial: navegação por identidades e caminhos, preview com scroll, filtro simples, clipboard e OTP. A implementação ainda precisa ser validada manualmente contra um cofre real em diferentes terminais.
