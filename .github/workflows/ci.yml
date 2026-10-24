@@ -10,9 +10,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Install Bats and PTY utilities
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes bats util-linux
       - name: Check Bash syntax
         run: |
           bash -n npass-tui
-          bash -n tests/test-npass-tui.sh
-      - name: Run mock CLI PTY smoke tests
-        run: bash tests/test-npass-tui.sh
+          bash -n tests/test-npass-tui.bats
+      - name: Run Bats tests
+        run: bats tests/test-npass-tui.bats
