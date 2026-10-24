@@ -1,74 +1,76 @@
 # Auditoria da CLI do npass para o npass-tui
 
-Data da auditoria: 2026-10-24
+Data da revisão: 2026-10-24
 
-## Escopo e fontes
+## Fonte autoritativa consultada
 
-Auditoria feita a partir do README e dos arquivos de despacho/uso do `npass` presentes na biblioteca de arquivos do projeto, além do código atual de `npass-tui`. A consulta direta ao repositório `HGBits/npass` falhou com HTTP 404 pela integração disponível; portanto, os detalhes abaixo refletem os arquivos de fonte disponíveis e devem ser conferidos contra a versão instalada antes de habilitar escrita.
+Repositório: https://github.com/HGBits/npass-store  
+README: https://github.com/HGBits/npass-store/blob/master/README.md  
+Código consultado na revisão: `lib/15-tree.bash` e `lib/03-store.bash`.
 
-## Comandos identificados
+O README identifica o npass como versão 2.5. Esta revisão substitui as suposições de compatibilidade baseadas em cópias antigas de documentação.
 
-| Operação | Comando/forma documentada | Uso na TUI |
+## Operações confirmadas
+
+| Operação | Forma documentada/confirmada | Observações para a TUI |
 |---|---|---|
-| Listar identidades | `npass identities` (alias `ids`) | Já usado |
-| Criar identidade | `npass init ID RECIPIENT...` | Futuro; fluxo sensível, pode pedir chave GPG |
-| Ler segredo | `npass show ID CAMINHO` | Já existe, mas a TUI usa `show --raw`; confirmar se `--raw` existe na versão-alvo |
-| Inserir/atualizar entrada | `npass insert [-f] ID CAMINHO` (alias `add`) | Fase seguinte |
-| Editar entrada | `npass edit ID CAMINHO` | Fase seguinte; usa `$EDITOR`, então não é um editor embutido |
-| Excluir entrada | `npass rm [-f] ID CAMINHO` (aliases `remove`, `delete`) | Fase seguinte; confirmação explícita na TUI |
-| Renomear/mover entrada | `npass mv ID CAMINHO DEST` (alias `rename`) | Futuro |
-| Listar caminhos | `npass ls ID [DIR]` (alias `list`) | A TUI usa atualmente `npass tree --flat ID`; provável incompatibilidade a corrigir |
-| Gerar senha | `npass generate [-n|-c|-f] [--in-place] ID CAMINHO [LEN]` (alias `gen`) | Futuro |
-| Rotacionar em lote | `npass update [OPÇÕES] ID PADRÃO...` | Futuro; requer UX cuidadosa e confirmação |
-| Buscar caminhos | `npass find ID PADRÃO` | Pode alimentar filtro/busca |
-| Buscar conteúdo | `npass grep ID [OPÇÕES] PADRÃO` | Futuro; não renderizar segredos encontrados em logs/status |
-| Copiar senha/campo/entrada | `npass clip [CAMPO] ID CAMINHO` | Já usa forma básica |
-| OTP | `npass otp ID CAMINHO` | Já usa geração de código |
-| Copiar OTP | `npass otp clip ID CAMINHO` | Alternativa preferível para não exibir código na tela |
-| Inserir/atualizar OTP | `npass otp insert [-f] ID CAMINHO` | Futuro |
-| URI/QR de OTP | `npass otp uri [-c|-q] ID CAMINHO` | Futuro; URI contém segredo e exige cuidado |
-| Validar URI OTP | `npass otp validate URI` | Futuro |
-| Assinar identidade | `npass sign ID [KEYID]` | Administração avançada |
-| Extensões | `npass extension list|sign|install ...` | Fora do escopo inicial |
-| Git do cofre | `npass git ARGS...` | Fora do escopo inicial; evitar expor saída sensível |
-| Tomb | `npass tomb create|open|close|status|list ID` | Administração avançada; confirmar suporte na versão-alvo |
-| Importação | `migrate` / `migrate-secrets` aparecem em uma versão do uso; outra fonte indica que foram movidos para a extensão `npass-import` | Não integrar até confirmar a versão |
+| Listar identidades | `npass identities` (alias `ids`) | A saída inclui contagem: `ID - N senhas`. |
+| Criar identidade | `npass init ID RECIPIENT...` | Fluxo administrativo; pode envolver GPG. |
+| Listar caminhos | `npass tree --flat ID [DIR]` | Confirmado em `lib/15-tree.bash`; um caminho lógico por linha. `ls/list` foi removido. |
+| Ler entrada sem renderização | `npass show --raw ID CAMINHO` | Confirmado no README; adequado para preview, com cuidado ao renderizar sequências de controle. |
+| Inserir entrada | `npass insert [-f] ID CAMINHO` | Entrada existente pede confirmação; `-f` força substituição. |
+| Editar entrada | `npass edit ID CAMINHO` | Abre `$EDITOR`, usa arquivo temporário seguro, valida formato md1 antes de gravar; também cria entrada se ela ainda não existir. |
+| Excluir entrada | `npass rm [-f] ID CAMINHO` | Pede confirmação por padrão; anexos de backup podem ser removidos junto. |
+| Renomear/mover | `npass mv ID ORIGEM DESTINO` | Mesma identidade: altera o mapa; entre identidades: decifra e recifra para o destino. |
+| Gerar senha | `npass generate [-n] [-c] [-f] [--in-place] ID CAMINHO [TAMANHO]` | Senha vai para stdout por padrão; `-c` copia. Pode sobrescrever com confirmação. |
+| Buscar caminhos | `npass find ID PADRÃO` | Pesquisa nomes de caminhos, não conteúdo. |
+| Buscar conteúdo | `npass grep ID [OPÇÕES] PADRÃO` | Decifra entradas; saída pode conter segredos. Não despejar resultados automaticamente na interface. |
+| Copiar senha/campo | `npass clip [CAMPO] ID CAMINHO` | A senha é o padrão; `all` copia o documento inteiro. |
+| Gerar OTP | `npass otp ID CAMINHO` | Mostra o código; TOTP/HOTP são suportados. |
+| Copiar OTP | `npass otp clip ID CAMINHO` | Preferível para ação de cópia sem mostrar o código na tela. |
+| Inserir OTP | `npass otp insert [-f] ID CAMINHO` | Operação de escrita separada. |
+| URI OTP | `npass otp uri ID CAMINHO` | URI contém segredo; não mostrar ou registrar sem ação explícita. |
+| Rotacionar em lote | `npass update ...` | Adiar até haver confirmação de escopo e resumo de alterações. |
+| Extensões, Git, importação, tomb e passkeys | Ver README e ajuda por categoria | Escopo avançado; confirmar cada subcomando antes de integrar. |
 
-## Incompatibilidades e riscos encontrados
+## Correções em relação à auditoria anterior
 
-1. **Listagem de caminhos:** a TUI chama `npass tree --flat ID`, mas a CLI disponível documenta `npass ls ID [DIR]`. O parser deve ser adaptado ao formato real de `ls` (a saída pode incluir o nome da identidade e indentação).
-2. **Leitura bruta:** a TUI chama `npass show --raw ID CAMINHO`, enquanto a referência disponível documenta `npass show ID CAMINHO`. Confirmar suporte a `--raw` antes de confiar nessa chamada.
-3. **Inserção não é só criação:** `insert` pode atualizar uma entrada existente; a TUI precisa detectar conflito ou exigir confirmação/usar `-f` somente após confirmação explícita.
-4. **Edição delegada ao editor:** `npass edit` abre `$EDITOR`; a TUI deve suspender seu modo raw, restaurar echo/icanon e redesenhar a tela após o editor fechar.
-5. **Exclusão e movimento:** operações destrutivas precisam confirmação que mostre identidade e caminho completos; cancelar com Esc não pode executar nada.
-6. **Segredos em tela/argumentos:** evitar segredos em mensagens de status, logs e argumentos de processos quando o CLI oferecer entrada por stdin. Preferir `npass otp clip` se a intenção for copiar OTP.
-7. **Fonte/versionamento:** arquivos disponíveis incluem referências de versões diferentes para importação. Consultar `npass --help` e comandos `--help` na versão instalada antes de implementar cada ação.
+1. **Não há incompatibilidade na listagem atual:** `npass tree --flat ID` é a interface de máquina documentada e implementada. `npass ls/list` foi removido.
+2. **Não há incompatibilidade na leitura bruta:** `npass show --raw ID CAMINHO` é documentado pela versão consultada.
+3. O projeto do npass é modular: o executável é gerado a partir de `lib/` com `./build.sh`. A integração da TUI não deve editar nem depender de detalhes internos desses módulos.
 
-## Recomendação para a próxima fase
+## Riscos e requisitos de UX
 
-Antes de adicionar operações de escrita, corrigir e testar os dois pontos de compatibilidade de leitura/listagem. Depois implementar, nesta ordem:
+- **Terminal:** antes de executar `npass edit`, restaurar o estado original do terminal; depois, reativar o modo de leitura da TUI e redesenhar a tela. O editor externo precisa de entrada/saída normais.
+- **Sobrescrita:** `insert` atualiza uma entrada existente. Não passar `-f` sem confirmação explícita.
+- **Exclusão:** confirmar mostrando identidade e caminho completos. Esc cancela sem executar.
+- **Movimentação:** distinguir renomeação na mesma identidade de movimentação entre identidades; validar o destino antes de chamar o comando.
+- **Segredos no terminal:** remover sequências de controle ANSI/OSC de nomes e conteúdo antes de desenhá-los. Evitar guardar saídas que contenham segredos em status, logs ou arquivos temporários da TUI.
+- **OTP:** oferecer ações separadas para mostrar e copiar; para copiar, usar `npass otp clip ID CAMINHO`.
+- **Geração:** deixar claro quando a operação cria uma entrada, substitui a senha inteira ou troca somente a senha com `--in-place`.
+- **Testes:** usar um executável `npass` simulado e fixtures temporárias; não executar testes destrutivos contra o cofre real.
 
-1. `insert` com detecção de entrada existente e confirmação;
-2. `edit` com restauração segura do terminal ao invocar `$EDITOR`;
-3. `rm` com confirmação explícita;
-4. `mv` e `generate`;
-5. operações OTP adicionais e busca.
+## Ordem recomendada para a implementação
 
-## Verificações necessárias no ambiente-alvo
+1. Reforçar sanitização de texto e testes de parsing da saída.
+2. Adicionar criação de entrada com confirmação de sobrescrita.
+3. Adicionar edição delegada ao `$EDITOR`, restaurando o terminal corretamente.
+4. Adicionar exclusão com confirmação.
+5. Adicionar geração de senha e movimentação/renomeação.
+6. Adicionar operações OTP complementares e busca por caminhos.
+7. Considerar operações em lote e administração somente depois de testes específicos.
 
-Executar sem passar dados secretos:
+## Validação no ambiente instalado
+
+A documentação do repositório é a referência da versão consultada, mas a versão instalada ainda deve ser verificada sem revelar dados secretos:
 
 ```sh
-npass --help
-npass ls --help
+npass help
+npass help entradas
+npass help gerar
+npass help otp
+npass tree --help
 npass show --help
-npass insert --help
-npass edit --help
-npass rm --help
-npass mv --help
-npass generate --help
-npass update --help
-npass otp --help
 ```
 
-A CLI pode não implementar `--help` individual para todos os comandos; nesse caso, usar apenas a mensagem de uso retornada e conferir a versão instalada. Não executar operações destrutivas como teste contra um cofre real.
+A CLI usa ajuda por categoria; nem todo comando necessariamente implementa uma opção `--help` própria. Não executar operações destrutivas apenas para descobrir sua sintaxe.
