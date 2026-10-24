@@ -83,7 +83,7 @@ read_key() {
 sanitize_text() {
     # Strip terminal escape sequences and control characters from untrusted text.
     printf '%s' "$1" | LC_ALL=C sed -E \
-        's|\x1B\][^\x07]*(\x07|\x1B\\)||g; s|\x1B\[[0-?]*[ -/]*[@-~]||g; s|\x1B[@-_]||g; s|[[:cntrl:]]||g'
+        's#\x1B\][^\x07]*(\x07|\x1B\\)##g; s#\x1B\[[0-?]*[ -/]*[@-~]##g; s#\x1B[@-_]##g; s#[[:cntrl:]]##g'
 }
 
 set_status() {
