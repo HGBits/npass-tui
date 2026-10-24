@@ -102,6 +102,11 @@ load_identities() {
 
 load_paths() {
     local output line
+    # Never leave paths from the previous identity selectable after an error.
+    PATHS=()
+    VISIBLE=()
+    CURSOR=0
+    OFFSET=0
     output=$("$NPASS_BIN" tree --flat "$CURRENT_ID" 2>&1) || { set_status "Erro ao listar entradas: $output"; return 1; }
     PATHS=()
     while IFS= read -r line; do [[ -n $line ]] && PATHS+=("$line"); done <<< "$output"
@@ -131,7 +136,7 @@ put() {
     printf '%.*s' "$max" "$text"
 }
 
-clear_line() { put "$1" 0 "$(printf '%*s' "$COLS" '' | tr ' ' ' ')" "$COLS"; }
+clear_line() { put "$1" 0 "$(printf '%*s' "$COLS" '')" "$COLS"; }
 
 header() {
     term_size
