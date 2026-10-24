@@ -1,0 +1,148 @@
+#!/usr/bin/env bash
+# Thin Bash/dialog interface for npass. Secret handling remains in npass.
+set -uo pipefail
+
+NPASS_BIN="${NPASS_BIN:-npass}"
+DIALOG_BIN="${DIALOG_BIN:-dialog}"
+APP_NAME="npass-tui"
+
+die() {
+    printf '%s: %s\n' "$APP_NAME" "$*" >&2
+    exit 1
+}
+
+have() { command -v "$1" >/dev/null 2>&1; }
+npass() { "$NPASS_BIN" "$@"; }
+
+ui_error() {
+    "$DIALOG_BIN" --title "$APP_NAME - erro" --msgbox "$1" 8 68
+}
+ui_info() {
+    "$DIALOG_BIN" --title "$APP_NAME" --msgbox "$1" 8 68
+}
+menu() {
+    local title=$1 prompt=$2 height=$3 width=$4 list_height=$5
+    shift 5
+    "$DIALOG_BIN" --stdout --clear --title "$title" --menu "$prompt" "$height" "$width" "$list_height" "$@"
+}
+
+get_identities() {
+    local output line ident
+    output=$(npass identities 2>&1) || {
+        ui_error "Não foi possível listar identidades.\n\n$output"
+        return 1
+    }
+    IDENTITIES=()
+    while IFS= read -r line; do
+        ident=$(printf '%s\n' "$line" | sed -E 's/[[:space:]]+-[[:space:]]+[0-9]+[[:space:]].*$//; s/^[[:space:]]+//; s/[[:space:]]+$//')
+        [[ -n $ident ]] && IDENTITIES+=("$ident")
+    done <<< "$output"
+    (("${#IDENTITIES[@]}" > 0)) || {
+        ui_error "Nenhuma identidade encontrada."
+        return 1
+    }
+}
+
+get_paths() {
+    local output line
+    output=$(npass tree --flat "$1" 2>&1) || {
+        ui_error "Não foi possível listar as entradas.\n\n$output"
+        return 1
+    }
+    PATHS=()
+    while IFS= read -r line; do
+        [[ -n $line ]] && PATHS+=("$line")
+    done <<< "$output"
+}
+
+show_entry() {
+    local ident=$1 path=$2 content
+    content=$(npass show --raw "$ident" "$path" 2>&1) || {
+        ui_error "Não foi possível abrir a entrada.\n\n$content"
+        return
+    }
+    "$DIALOG_BIN" --title "$ident / $path" --no-collapse --msgbox "$content" 22 76
+}
+
+copy_password() {
+    local ident=$1 path=$2 output
+    output=$(npass clip "$ident" "$path" 2>&1) || {
+        ui_error "Falha ao copiar a senha.\n\n$output"
+        return
+    }
+    ui_info "Comando npass clip concluído. A senha foi enviada ao clipboard pelo npass."
+}
+
+show_otp() {
+    local ident=$1 path=$2 output
+    output=$(npass otp "$ident" "$path" 2>&1) || {
+        ui_error "Não foi possível obter o OTP.\n\n$output"
+        return
+    }
+    ui_info "OTP para $path:\n\n$output"
+}
+
+entries_screen() {
+    local ident=$1 query="" selected="" path action
+    local -a filtered=() args=()
+    while :; do
+        get_paths "$ident" || return
+        filtered=()
+        if [[ -n $query ]]; then
+            for path in "${PATHS[@]}"; do
+                [[ $path == *"$query"* ]] && filtered+=("$path")
+            done
+        else
+            filtered=("${PATHS[@]}")
+        fi
+        if (("${#filtered[@]}" == 0)); then
+            if [[ -n $query ]]; then
+                ui_info "Nenhuma entrada corresponde ao filtro: $query"
+                query=""
+                continue
+            fi
+            ui_info "Esta identidade não contém entradas."
+            return
+        fi
+        args=()
+        for path in "${filtered[@]}"; do args+=("$path" ""); done
+        selected=$(menu "$ident" "Selecione uma entrada. Filtro: ${query:-nenhum}" 22 78 14 "${args[@]}") || return
+        [[ -n $selected ]] || return
+        action=$(menu "$selected" "Ação para esta entrada" 15 64 5 \
+            "Abrir" "Visualizar conteúdo" \
+            "Copiar" "Copiar senha via npass" \
+            "OTP" "Consultar código OTP" \
+            "Filtrar" "Filtrar caminhos" \
+            "Voltar" "Voltar à lista") || continue
+        case $action in
+            Abrir) show_entry "$ident" "$selected" ;;
+            Copiar) copy_password "$ident" "$selected" ;;
+            OTP) show_otp "$ident" "$selected" ;;
+            Filtrar)
+                query=$("$DIALOG_BIN" --stdout --title "Filtrar entradas" \
+                    --inputbox "Trecho do caminho (vazio remove o filtro)" 10 68 "$query") || query=""
+                ;;
+            Voltar) ;;
+        esac
+    done
+}
+
+main() {
+    have "$DIALOG_BIN" || die "Dependência ausente: dialog. Instale dialog e tente novamente."
+    have "$NPASS_BIN" || die "npass não encontrado. Instale-o ou defina NPASS_BIN=/caminho/para/npass."
+    have sed || die "Dependência ausente: sed."
+    get_identities || return 1
+    local ident
+    local -a args=()
+    while :; do
+        args=()
+        for ident in "${IDENTITIES[@]}"; do args+=("$ident" ""); done
+        ident=$(menu "npass-tui" "Selecione uma identidade" 20 72 12 "${args[@]}") || break
+        [[ -n $ident ]] || break
+        entries_screen "$ident"
+    done
+    "$DIALOG_BIN" --clear --title "$APP_NAME" --infobox "Até a próxima." 3 24
+    sleep 0.4
+}
+
+main "$@"
