@@ -6,6 +6,7 @@ TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 MOCK_NPASS="$TMP/npass"
 LOG="$TMP/argv.log"
+PTY_OUT="$TMP/pty.out"
 
 cat >"$MOCK_NPASS" <<'MOCK'
 #!/usr/bin/env bash
@@ -50,7 +51,12 @@ run_tui() {
     esac
   } | TERM=xterm NPASS_BIN="$MOCK_NPASS" NPASS_LOG="$LOG" \
     script -qefc "env TERM=xterm NPASS_BIN='$MOCK_NPASS' NPASS_LOG='$LOG' bash '$ROOT/npass-tui'" /dev/null \
-    >/dev/null 2>&1
+    >"$PTY_OUT" 2>&1
+  if grep -Fq 'sed: -e expression' "$PTY_OUT"; then
+    echo 'FAIL: sanitizer emitted a sed expression error' >&2
+    cat "$PTY_OUT" >&2
+    return 1
+  fi
 }
 
 assert_log_has() {
@@ -63,7 +69,7 @@ assert_log_has() {
 }
 
 # Create: Enter identity, press a, submit a path, then quit.
-run_tui $'\ra\nnew/site\nq'
+run_tui create
 assert_log_has 'identities'
 assert_log_has 'tree --flat personal'
 assert_log_has 'insert personal new/site'
@@ -73,11 +79,11 @@ if grep -Eq '^insert .* (-f|--force)( |$)' "$LOG"; then
 fi
 
 # Edit: Enter identity, move to entries, press e, then quit.
-run_tui $'\re q'
+run_tui edit
 assert_log_has 'edit personal example/login'
 
 # Empty path cancels creation without calling insert.
-run_tui $'\ra\nq'
+run_tui cancel
 if grep -Eq '^insert ' "$LOG"; then
   echo 'FAIL: empty path should cancel without invoking insert' >&2
   exit 1
