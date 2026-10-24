@@ -1,0 +1,182 @@
+#!/usr/bin/env python3
+"""Thin curses interface for npass. All secret/store operations stay in npass."""
+import curses
+import os
+import subprocess
+import sys
+import textwrap
+
+
+def run_npass(args, *, timeout=60):
+    try:
+        p = subprocess.run([os.environ.get('NPASS_BIN', 'npass'), *args],
+                           text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                           timeout=timeout, check=False)
+    except FileNotFoundError:
+        raise RuntimeError('npass não encontrado. Instale-o ou defina NPASS_BIN.')
+    except subprocess.TimeoutExpired:
+        raise RuntimeError('npass demorou demais para responder.')
+    if p.returncode:
+        raise RuntimeError((p.stderr or p.stdout or f'npass saiu com código {p.returncode}').strip())
+    return p.stdout
+
+
+def identities():
+    out = run_npass(['identities'])
+    result = []
+    for line in out.splitlines():
+        # Output format is localized, so retain the left-hand label when possible.
+        ident = line.split(' - ', 1)[0].strip()
+        if ident and not ident.startswith(('Nenhuma', 'No ')):
+            result.append(ident)
+    if not result:
+        raise RuntimeError('Nenhuma identidade encontrada.')
+    return result
+
+
+def draw(stdscr, title, rows, selected, status, query=''):
+    stdscr.erase()
+    h, w = stdscr.getmaxyx()
+    if h < 8 or w < 40:
+        stdscr.addstr(0, 0, 'Terminal pequeno demais (mínimo 40x8).')
+        stdscr.refresh()
+        return
+    stdscr.attron(curses.color_pair(1) | curses.A_BOLD)
+    stdscr.addnstr(0, 0, f' npass-tui  /  {title} ', w - 1)
+    stdscr.attroff(curses.color_pair(1) | curses.A_BOLD)
+    stdscr.addnstr(1, 1, f'Filtro: {query or "(nenhum)"}', w - 2)
+    visible = rows
+    top = max(0, min(selected - (h - 7), max(0, len(visible) - (h - 5))))
+    for y, item in enumerate(visible[top:top + h - 5], start=3):
+        idx = top + y - 3
+        if idx == selected:
+            stdscr.attron(curses.color_pair(2) | curses.A_BOLD)
+            stdscr.addnstr(y, 1, '> ' + item, w - 2)
+            stdscr.attroff(curses.color_pair(2) | curses.A_BOLD)
+        else:
+            stdscr.addnstr(y, 1, '  ' + item, w - 2)
+    stdscr.attron(curses.A_DIM)
+    stdscr.addnstr(h - 2, 1, status, w - 2)
+    stdscr.addnstr(h - 1, 1, '↑/↓ navegar  Enter abrir  / filtrar  c copiar senha  o OTP  Esc voltar  q sair', w - 2)
+    stdscr.attroff(curses.A_DIM)
+    stdscr.refresh()
+
+
+def message(stdscr, msg):
+    h, w = stdscr.getmaxyx()
+    lines = []
+    for raw in str(msg).splitlines() or ['']:
+        lines.extend(textwrap.wrap(raw, max(10, w - 4)) or [''])
+    stdscr.erase()
+    stdscr.addnstr(0, 0, ' npass-tui ', w - 1, curses.A_REVERSE)
+    for i, line in enumerate(lines[:h - 3], 2):
+        stdscr.addnstr(i, 2, line, w - 4)
+    stdscr.addnstr(h - 1, 0, 'Pressione qualquer tecla para continuar', w - 1, curses.A_DIM)
+    stdscr.refresh()
+    stdscr.getch()
+
+
+def read_entry(stdscr, ident, path):
+    raw = run_npass(['show', '--raw', ident, path])
+    h, w = stdscr.getmaxyx()
+    lines = raw.splitlines()
+    offset = 0
+    while True:
+        stdscr.erase()
+        stdscr.attron(curses.color_pair(1) | curses.A_BOLD)
+        stdscr.addnstr(0, 0, f' {ident}/{path} ', w - 1)
+        stdscr.attroff(curses.color_pair(1) | curses.A_BOLD)
+        for i, line in enumerate(lines[offset:offset + h - 3], 1):
+            # Raw secrets are displayed exactly as returned; do not write them to disk.
+            stdscr.addnstr(i, 1, line, w - 2)
+        stdscr.addnstr(h - 1, 0, '↑/↓ rolar  c copiar senha  o OTP  Esc voltar', w - 1, curses.A_DIM)
+        stdscr.refresh()
+        key = stdscr.getch()
+        if key in (27, ord('q'), ord('Q')):
+            return
+        if key in (curses.KEY_DOWN, ord('j')):
+            offset = min(max(0, len(lines) - h + 3), offset + 1)
+        elif key in (curses.KEY_UP, ord('k')):
+            offset = max(0, offset - 1)
+        elif key == ord('c'):
+            message(stdscr, run_npass(['clip', ident, path]) or 'Senha enviada ao clipboard pelo npass.')
+        elif key == ord('o'):
+            message(stdscr, run_npass(['otp', ident, path]) or 'Comando OTP concluído.')
+
+
+def app(stdscr):
+    curses.curs_set(0)
+    curses.start_color()
+    curses.use_default_colors()
+    curses.init_pair(1, curses.COLOR_CYAN, -1)
+    curses.init_pair(2, curses.COLOR_BLACK, curses.COLOR_CYAN)
+    try:
+        ids = identities()
+    except RuntimeError as exc:
+        message(stdscr, exc)
+        return
+    id_idx, path_idx, ident, paths, query, status = 0, 0, ids[0], [], '', 'Escolha uma identidade.'
+    mode = 'identities'
+    while True:
+        if mode == 'identities':
+            rows = ids
+            selected = id_idx
+            title = 'Identidades'
+        else:
+            filtered = [p for p in paths if query.casefold() in p.casefold()]
+            rows = filtered or (['(nenhuma entrada corresponde ao filtro)'] if query else ['(identidade vazia)'])
+            selected = min(path_idx, len(rows) - 1)
+            title = ident
+        draw(stdscr, title, rows, selected, status, query if mode == 'entries' else '')
+        key = stdscr.getch()
+        if key in (ord('q'), ord('Q')):
+            if mode == 'entries':
+                mode, query, status = 'identities', '', 'Escolha uma identidade.'
+                continue
+            return
+        if key in (curses.KEY_UP, ord('k')):
+            if mode == 'identities': id_idx = max(0, id_idx - 1)
+            else: path_idx = max(0, path_idx - 1)
+        elif key in (curses.KEY_DOWN, ord('j')):
+            if mode == 'identities': id_idx = min(len(ids) - 1, id_idx + 1)
+            else: path_idx = min(max(0, len([p for p in paths if query.casefold() in p.casefold()]) - 1), path_idx + 1)
+        elif key in (10, 13, curses.KEY_ENTER):
+            try:
+                if mode == 'identities':
+                    ident = ids[id_idx]
+                    paths = run_npass(['tree', '--flat', ident]).splitlines()
+                    path_idx, query, mode = 0, '', 'entries'
+                    status = f'{len(paths)} caminhos. A listagem não decifra as entradas.'
+                else:
+                    if rows and not rows[0].startswith('('): read_entry(stdscr, ident, rows[selected])
+            except RuntimeError as exc:
+                message(stdscr, exc)
+        elif key == 27 and mode == 'entries':
+            mode, query, status = 'identities', '', 'Escolha uma identidade.'
+        elif key == ord('/') and mode == 'entries':
+            curses.echo()
+            curses.curs_set(1)
+            stdscr.addstr(stdscr.getmaxyx()[0] - 2, 0, 'Filtro: ')
+            query = stdscr.getstr(stdscr.getmaxyx()[0] - 2, 8, 200).decode('utf-8', 'replace')
+            curses.noecho(); curses.curs_set(0); path_idx = 0
+        elif key == ord('c') and mode == 'entries':
+            try:
+                if rows and not rows[0].startswith('('):
+                    message(stdscr, run_npass(['clip', ident, rows[selected]]) or 'Senha enviada ao clipboard pelo npass.')
+            except RuntimeError as exc: message(stdscr, exc)
+        elif key == ord('o') and mode == 'entries':
+            try:
+                if rows and not rows[0].startswith('('): message(stdscr, run_npass(['otp', ident, rows[selected]]) or 'Comando OTP concluído.')
+            except RuntimeError as exc: message(stdscr, exc)
+
+
+def main():
+    try:
+        curses.wrapper(app)
+    except RuntimeError as exc:
+        print(f'npass-tui: {exc}', file=sys.stderr)
+        return 1
+    return 0
+
+if __name__ == '__main__':
+    raise SystemExit(main())
