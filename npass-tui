@@ -41,8 +41,7 @@ get_identities() {
     IDENTITIES=()
     while IFS= read -r line; do
         # npass prints: IDENTITY - N senhas. Keep the identity label intact.
-        ident=$(printf '%s\n' "$line" | sed -E 's/[[:space:]]+-[[:space:]]+[0-9]+[[:space:]].*$//')
-        ident=${ident#" ${ident%%[![:space:]]*}"}
+        ident=$(printf '%s\n' "$line" | sed -E 's/[[:space:]]+-[[:space:]]+[0-9]+[[:space:]].*$//; s/^[[:space:]]+//; s/[[:space:]]+$//')
         [[ -n $ident ]] && IDENTITIES+=("$ident")
     done <<< "$output"
     (("${#IDENTITIES[@]}" > 0)) || {
