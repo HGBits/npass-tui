@@ -14,13 +14,13 @@ A TUI já oferece:
 - [x] Copiar senha/campo padrão usando `npass clip ID CAMINHO`.
 - [x] Solicitar OTP pela CLI (`npass otp`).
 - [x] Devolver o terminal à CLI para operações interativas e reativar o modo da TUI após o retorno.
-- [x] Testes Bats iniciais para criação e edição e workflow de CI com verificação de sintaxe. A cobertura e o resultado mais recente do CI devem ser verificados antes de considerar os fluxos plenamente validados.
+- [x] Testes Bats para criação, edição e exclusão com driver PTY determinístico; CI valida sintaxe Bash/Python e executa os seis cenários.
 
 ## Pendências
 
 ### P0 — Segurança e confiabilidade
 
-- [ ] **Ampliar testes com mock da CLI e pseudo-terminal (PTY).** Cobrir falha de `npass`, retorno não zero, cancelamento, entradas com caracteres de controle, restauração do terminal após falha/sinal e confirmação de que nenhum segredo vai para argv/log/status.
+- [ ] **Completar a cobertura com mock da CLI e pseudo-terminal (PTY).** O driver determinístico já cobre criação/edição/exclusão, cancelamento e retorno não zero. Ainda faltam caracteres de controle, restauração do terminal após falha/sinal e verificação de que nenhum segredo vai para argv/log/status.
 - [ ] **Validar a integração real com terminal e cofre de teste.** Testar manualmente `insert`, `edit`, preview, clipboard e OTP em pelo menos um terminal compatível; não usar o cofre pessoal como fixture.
 - [ ] **Revisar limpeza visual de segredos.** Ao sair do preview ou após exibir OTP, limpar/redesenhar a tela quando apropriado e evitar manter conteúdo secreto em status ou mensagens duradouras.
 - [ ] **Tratar nomes/caminhos e saída inesperada da CLI de forma robusta.** Não depender de parsing frágil da saída humana; validar nomes e falhas sem esconder erros de descriptografia.
@@ -40,7 +40,7 @@ A TUI já oferece:
 - [ ] **Ações OTP separadas.** Separar “mostrar código” de “copiar código” (`npass otp clip`); não exibir URI `otpauth://` nem segredo OTP sem ação explícita.
 - [ ] **Gerenciamento de PIN (`npass pin`).** Expor escolha inequívoca entre PIN como senha (`--password`) e PIN como campo (`--field`); explicar sobrescrita e não assumir que os modos são intercambiáveis.
 - [ ] **Cadastro/atualização de OTP.** Integrar `npass otp insert` somente com fluxo interativo claro e confirmação de sobrescrita.
-- [ ] **Frases memoráveis/Diceware.** Adicionar `npass memorable` e `npass diceware), incluindo as implicações específicas da lista pessoal e da recuperação offline do Diceware.
+- [ ] **Frases memoráveis/Diceware.** Adicionar `npass memorable` e `npass diceware`, incluindo as implicações específicas da lista pessoal e da recuperação offline do Diceware.
 
 ### P3 — Recursos avançados, depois do núcleo
 
