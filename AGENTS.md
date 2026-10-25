@@ -26,7 +26,7 @@ Este repositório contém uma interface de terminal (TUI) em Bash para o `npass`
 5. Trate toda saída do cofre como entrada não confiável. Remova sequências ANSI/OSC e caracteres de controle antes de desenhar texto na tela. Não altere o caminho original passado à CLI apenas para sanitizar sua representação visual.
 6. Verifique o código de saída de cada chamada. Saída vazia não significa sucesso.
 7. Antes de chamar `npass insert`, `npass edit` ou outro comando interativo, restaure o estado original do terminal e mostre o cursor. Após o retorno, restaure o modo da TUI mesmo em caso de erro; não deixe o terminal preso em modo raw.
-8. Não interprete a saída decorativa de comandos como `npass identities` como API estruturada estável. Para listagem de caminhos, prefira `npass ls --flat ID` na versão atual do npass-store; confira `docs/CLI-AUDIT.md` e valide o contrato antes de depender de outra versão.
+8. Não interprete a saída decorativa de comandos como `npass identities` como API estruturada estável. **Versão-alvo de compatibilidade: npass-store 2.8.** Para listar caminhos, use `npass ls --flat ID`. Não implemente fallback para `npass tree` nem compatibilidade com 2.5 sem uma nova decisão explícita do projeto.
 9. Não suponha que extensões opcionais estejam instaladas ou habilitadas. Detecte indisponibilidade e mostre uma mensagem clara.
 10. A TUI não deve afirmar que uma operação é segura só porque a interface a escondeu. Limpe previews e códigos secretos da tela quando sair deles ou após ações sensíveis, sempre que viável.
 
