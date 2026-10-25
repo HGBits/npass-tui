@@ -38,3 +38,13 @@ assert_log_has() {
   local expected="$1"
   grep -Fxq -- "$expected" "$LOG"
 }
+
+# Bats-style runner that preserves status while printing captured PTY diagnostics
+# on failure; otherwise Bats hides the output of its `run` helper.
+run_tui_case() {
+  run run_tui "$1"
+  if (( status != 0 )); then
+    printf '%s\n' "$output" >&2
+  fi
+  return 0
+}
