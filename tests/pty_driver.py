@@ -39,10 +39,10 @@ def main():
     output = bytearray()
     deadline = time.monotonic() + 10
 
-    def read_until(marker, timeout=3):
+    def read_until(marker, timeout=3, after=0):
         end = min(time.monotonic() + timeout, deadline)
         needle = marker.encode("utf-8")
-        while needle not in output:
+        while output.find(needle, after) < 0:
             remaining = end - time.monotonic()
             if remaining <= 0:
                 raise TimeoutError("timed out waiting for prompt: " + marker)
@@ -56,8 +56,10 @@ def main():
             if not chunk:
                 break
             output.extend(chunk)
-        if needle not in output:
+        position = output.find(needle, after)
+        if position < 0:
             raise TimeoutError("child exited before prompt: " + marker)
+        return position + len(needle)
 
     def send(data):
         os.write(master, data.encode("utf-8"))
@@ -96,6 +98,18 @@ def main():
         else:
             raise ValueError("unknown scenario: " + scenario)
 
+        # The status text is printed before the footer; wait for the footer
+        # after that status before sending q, so the key cannot race the render.
+        status_marker = {
+            "create": "Entrada enviada ao npass",
+            "cancel": "Criação cancelada.",
+            "edit": "Edição concluída",
+            "edit-fail": "npass edit falhou (código 17)",
+            "delete": "Comando npass rm concluído",
+            "delete-cancel": "Exclusão cancelada.",
+        }[scenario]
+        status_end = output.find(status_marker.encode("utf-8"))
+        read_until("Esc voltar", after=status_end + len(status_marker.encode("utf-8")))
         send("q")
         remaining = max(0, deadline - time.monotonic())
         try:
