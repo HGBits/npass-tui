@@ -22,4 +22,4 @@ jobs:
       - name: Validate Bats test files
         run: bats --count tests/*.bats
       - name: Run Bats tests
-        run: bats tests/*.bats
+        run: timeout 90s bats tests/*.bats
