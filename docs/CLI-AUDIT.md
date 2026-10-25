@@ -9,7 +9,7 @@ Esta auditoria foi originalmente escrita contra o arquivo `projeto(2).zip`, que 
 
 Em 2026-10-25, o repositório público [HGBits/npass-store](https://github.com/HGBits/npass-store) foi consultado diretamente. O README atual identifica a versão **2.8**, e o código-fonte `lib/15-ls.bash`, o dispatcher `lib/00-main.bash`, a manpage e `tests/ls.bats` confirmam que o comando atual é `npass ls --flat ID [DIR]`. O comando `tree` foi explicitamente descontinuado e retorna erro com uma mensagem que aponta para `ls`.
 
-**Contrato adotado pela TUI para a CLI atual (npass-store 2.8):** `npass ls --flat ID [DIR]`. A tabela da versão 2.5 abaixo foi corrigida para deixar claro que seu contrato de listagem não corresponde ao atual. Se a TUI precisar suportar 2.5, isso deverá ser uma compatibilidade explícita, validada por versão ou por detecção segura, não uma troca cega de `ls` por `tree`.
+**Versão-alvo de compatibilidade do `npass_tui`: `npass-store` 2.8.** O contrato adotado é `npass ls --flat ID [DIR]`. A tabela da versão 2.5 abaixo é apenas registro histórico; compatibilidade com 2.5 não faz parte do escopo e não deve ser implementada sem uma nova decisão explícita do projeto.
 
 O ZIP original continha 91 entradas, incluindo README, `lib/`, `extensions/`, `tests/`, documentação de manpages e o helper Rust de passkeys. O executável `bin/npass` é gerado por `build.sh`; não é fonte primária e não veio no ZIP como artefato de referência.
 
@@ -176,7 +176,7 @@ Executado sobre o snapshot reenviado:
 
 **Fase 1 encerrada:** os contratos públicos relevantes para a TUI foram mapeados a partir do snapshot correto, as operações e efeitos colaterais estão documentados, e os riscos de terminal/segredos foram convertidos em requisitos de implementação.
 
-Não foram implementadas operações novas da TUI nesta fase. A próxima fase deve começar pela revisão da TUI atual e pelos testes de mock, depois seguir com `insert` e `edit`. O ZIP continua sendo a referência histórica para afirmar o comportamento da versão 2.5; para integração com a CLI pública atual, usar o contrato verificado no repositório `npass-store` 2.8. Não misturar os dois contratos sem compatibilidade explícita.
+Não foram implementadas operações novas da TUI nesta fase. A próxima fase deve começar pela revisão da TUI atual e pelos testes de mock, depois seguir com `insert` e `edit`. O ZIP continua sendo a referência histórica para afirmar o comportamento da versão 2.5; para integração com a CLI pública atual, usar o contrato verificado no repositório `npass-store` 2.8. Não implementar fallback nem compatibilidade com 2.5; a versão-alvo é exclusivamente 2.8.
 
 
 ## 10. Fase 2: criação e edição na TUI
