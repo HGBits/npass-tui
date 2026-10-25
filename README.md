@@ -33,6 +33,7 @@ NPASS_BIN="$HOME/.local/bin/npass" ./npass-tui
 - `o`: consultar OTP via `npass otp`
 - `a`: criar entrada, informando o caminho; o próprio `npass insert` solicita a senha duas vezes sem eco e confirma antes de sobrescrever
 - `e`: editar a entrada selecionada com `npass edit` e o editor definido em `$EDITOR`
+- `d`: excluir a entrada selecionada; exige digitar `sim`, avisa sobre anexos de backup e mantém a confirmação nativa do `npass rm`
 - `Esc`: voltar
 - `q`: voltar ou sair
 
