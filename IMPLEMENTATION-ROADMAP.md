@@ -1,6 +1,6 @@
 # Roadmap de implementação — npass-tui
 
-Comparação feita em 2026-10-25 entre o código público de [npass_tui](https://github.com/HGBits/npass_tui) (branch `main`) e o [npass-store](https://github.com/HGBits/npass-store) (branch `master`). Este documento descreve o estado observado nos repositórios públicos nesse momento; confirme os contratos da CLI antes de implementar, pois os dois projetos evoluem separadamente.
+Comparação feita em 2026-10-25 entre o código público de [npass_tui](https://github.com/HGBits/npass_tui) (branch `master`) e o [npass-store](https://github.com/HGBits/npass-store) (branch `master`, versão 2.8). A CLI atual usa `npass ls --flat ID [DIR]`; `tree` é legado e falha com orientação para `ls`. O contrato divergente de `tree --flat` documentado em `docs/CLI-AUDIT.md` pertence ao snapshot histórico npass 2.5, não à CLI atual.
 
 ## Estado atual observado
 
