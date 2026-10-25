@@ -17,14 +17,21 @@ case "$1" in
   ls) printf 'example/login\nsecond/entry\n' ;;
   insert|edit|rm) stty -g >>"$NPASS_TTY_LOG"; exit "${MOCK_ACTION_EXIT:-0}" ;;
   show)
+    if [[ ${MOCK_SHOW_FAIL:-0} == 1 ]]; then printf 'FAIL-SECRET-SENTINEL\\n'; exit 17; fi
     if [[ ${MOCK_SHOW_CONTROL:-0} == 1 ]]; then
       printf 'safe-line\033]0;PWNED-TITLE\007\033[?9999hstill-safe\n'
     else
       printf '<!-- npass:md1 -->\n## Senha\nnot-a-real-secret\n'
     fi
     ;;
-  clip) exit 0 ;;
-  otp) printf 'OTP-SENTINEL-123456\\n' ;;
+  clip)
+    if [[ ${MOCK_CLIP_FAIL:-0} == 1 ]]; then printf 'FAIL-SECRET-SENTINEL\\n'; exit 17; fi
+    exit 0
+    ;;
+  otp)
+    printf 'OTP-SENTINEL-123456\\n'
+    if [[ ${MOCK_OTP_FAIL:-0} == 1 ]]; then printf 'FAIL-SECRET-SENTINEL\\n'; exit 17; fi
+    ;;
   *) printf 'unexpected command: %s\n' "$1" >&2; exit 90 ;;
 esac
 MOCK
@@ -37,6 +44,11 @@ run_tui() {
   : >"$TTY_LOG"
   if ! TERM=xterm NPASS_BIN="$MOCK_NPASS" NPASS_LOG="$LOG" NPASS_TTY_LOG="$TTY_LOG" \
     MOCK_SHOW_CONTROL="${MOCK_SHOW_CONTROL:-0}" \
+    MOCK_SHOW_FAIL="${MOCK_SHOW_FAIL:-0}" \
+    MOCK_IDENTITIES_FAIL="${MOCK_IDENTITIES_FAIL:-0}" \
+    MOCK_LS_FAIL="${MOCK_LS_FAIL:-0}" \
+    MOCK_CLIP_FAIL="${MOCK_CLIP_FAIL:-0}" \
+    MOCK_OTP_FAIL="${MOCK_OTP_FAIL:-0}" \
     MOCK_ACTION_EXIT="${MOCK_ACTION_EXIT:-0}" \
     python3 "$ROOT/tests/pty_driver.py" "$scenario" "$ROOT/npass-tui" \
     >"$PTY_OUT" 2>&1; then
