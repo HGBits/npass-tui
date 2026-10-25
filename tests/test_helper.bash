@@ -5,6 +5,7 @@ setup() {
   TMP="$BATS_TEST_TMPDIR"
   MOCK_NPASS="$TMP/npass"
   LOG="$TMP/argv.log"
+  TTY_LOG="$TMP/tty.log"
   PTY_OUT="$TMP/pty.out"
 
   cat >"$MOCK_NPASS" <<'MOCK'
@@ -14,7 +15,7 @@ printf '%s\n' "$*" >>"$NPASS_LOG"
 case "$1" in
   identities) printf 'personal - 2 entries\n' ;;
   ls) printf 'example/login\nsecond/entry\n' ;;
-  insert|edit|rm) exit "${MOCK_ACTION_EXIT:-0}" ;;
+  insert|edit|rm) stty -g >>"$NPASS_TTY_LOG"; exit "${MOCK_ACTION_EXIT:-0}" ;;
   show)
     if [[ ${MOCK_SHOW_CONTROL:-0} == 1 ]]; then
       printf 'safe-line\033]0;PWNED-TITLE\007\033[?9999hstill-safe\n'
@@ -22,7 +23,8 @@ case "$1" in
       printf '<!-- npass:md1 -->\n## Senha\nnot-a-real-secret\n'
     fi
     ;;
-  clip|otp) exit 0 ;;
+  clip) exit 0 ;;
+  otp) printf 'OTP-SENTINEL-123456\\n' ;;
   *) printf 'unexpected command: %s\n' "$1" >&2; exit 90 ;;
 esac
 MOCK
@@ -32,7 +34,8 @@ MOCK
 run_tui() {
   local scenario="$1"
   : >"$LOG"
-  if ! TERM=xterm NPASS_BIN="$MOCK_NPASS" NPASS_LOG="$LOG" \
+  : >"$TTY_LOG"
+  if ! TERM=xterm NPASS_BIN="$MOCK_NPASS" NPASS_LOG="$LOG" NPASS_TTY_LOG="$TTY_LOG" \
     MOCK_SHOW_CONTROL="${MOCK_SHOW_CONTROL:-0}" \
     MOCK_ACTION_EXIT="${MOCK_ACTION_EXIT:-0}" \
     python3 "$ROOT/tests/pty_driver.py" "$scenario" "$ROOT/npass-tui" \
