@@ -39,7 +39,7 @@ NPASS_BIN="$HOME/.local/bin/npass" ./npass-tui
 
 ## Segurança e escopo
 
-- Identidades são obtidas por `npass identities`; caminhos por `npass tree --flat ID`.
+- Identidades são obtidas por `npass identities`; caminhos por `npass ls --flat ID`.
 - O conteúdo é obtido apenas quando solicitado, via `npass show --raw ID CAMINHO`.
 - A TUI não grava segredos em arquivos temporários nem implementa o formato de armazenamento do npass.
 - A TUI delega criação, edição e exclusão à CLI do `npass`; não implementa armazenamento nem parsing de escrita próprio. Movimentação e geração ainda não fazem parte da interface.
