@@ -69,6 +69,18 @@ def main():
         os.write(master, data.encode("utf-8"))
 
     try:
+        if scenario == "identities-fail":
+            read_until("Erro ao listar identidades (código 17)")
+            if b"FAIL-SECRET-SENTINEL" in output:
+                print("identity-list failure output leaked into the terminal", file=sys.stderr)
+                return 1
+            send("q")
+            return_code = proc.wait(timeout=max(0.1, deadline - time.monotonic()))
+            if return_code != 0 or termios.tcgetattr(master) != original_tty:
+                print("identity-list failure did not exit cleanly and restore the terminal", file=sys.stderr)
+                return 1
+            return 0
+
         read_until("personal")
 
         if scenario == "signal-term":
@@ -99,6 +111,21 @@ def main():
             return 0
 
         send("\r")
+        if scenario == "ls-fail":
+            read_until("Erro ao listar entradas (código 17)")
+            if b"FAIL-SECRET-SENTINEL" in output:
+                print("path-list failure output leaked into the terminal", file=sys.stderr)
+                return 1
+            send("q")
+            before_identity = len(output)
+            identity_end = read_until("Escolha uma identidade", after=before_identity)
+            read_until("Esc voltar", after=identity_end)
+            send("q")
+            return_code = proc.wait(timeout=max(0.1, deadline - time.monotonic()))
+            if return_code != 0:
+                print("TUI did not exit after path-list failure", file=sys.stderr)
+                return 1
+            return 0
         read_until("example/login")
 
         if scenario == "create":
@@ -128,6 +155,36 @@ def main():
             read_until('Digite exatamente "sim"')
             send("nao\n")
             read_until("Exclusão cancelada.")
+        elif scenario == "show-fail-secret":
+            send("\r")
+            read_until("Erro ao abrir entrada (código 17)")
+            if b"FAIL-SECRET-SENTINEL" in output:
+                print("preview failure output leaked into the terminal", file=sys.stderr)
+                return 1
+            send("x")
+            before_entries = len(output)
+            entries_end = read_until("Entradas", after=before_entries)
+            read_until("Esc voltar", after=entries_end)
+        elif scenario == "clip-fail-secret":
+            send("c")
+            read_until("Falha ao copiar (código 17)")
+            if b"FAIL-SECRET-SENTINEL" in output:
+                print("clipboard failure output leaked into the terminal", file=sys.stderr)
+                return 1
+            send("x")
+            before_entries = len(output)
+            entries_end = read_until("Entradas", after=before_entries)
+            read_until("Esc voltar", after=entries_end)
+        elif scenario == "otp-fail-secret":
+            send("o")
+            read_until("Falha ao obter OTP (código 17)")
+            if b"FAIL-SECRET-SENTINEL" in output or b"OTP-SENTINEL-123456" in output:
+                print("OTP failure output leaked into the terminal", file=sys.stderr)
+                return 1
+            send("x")
+            before_entries = len(output)
+            entries_end = read_until("Entradas", after=before_entries)
+            read_until("Esc voltar", after=entries_end)
         elif scenario == "otp-secret":
             send("o")
             secret = b"OTP-SENTINEL-123456"
@@ -164,6 +221,9 @@ def main():
             "edit": "Edição concluída",
             "edit-fail": "npass edit falhou (código 17)",
             "otp-secret": "Entradas",
+            "show-fail-secret": "Entradas",
+            "clip-fail-secret": "Entradas",
+            "otp-fail-secret": "Entradas",
             "delete": "Comando npass rm concluído",
             "delete-cancel": "Exclusão cancelada.",
             "control-output": "Entradas",
