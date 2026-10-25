@@ -14,7 +14,7 @@ printf '%s\n' "$*" >>"$NPASS_LOG"
 case "$1" in
   identities) printf 'personal - 2 entries\n' ;;
   tree) printf 'example/login\nsecond/entry\n' ;;
-  insert|edit) exit "${MOCK_ACTION_EXIT:-0}" ;;
+  insert|edit|rm) exit "${MOCK_ACTION_EXIT:-0}" ;;
   show) printf '<!-- npass:md1 -->\n## Senha\nnot-a-real-secret\n' ;;
   clip|otp) exit 0 ;;
   *) printf 'unexpected command: %s\n' "$1" >&2; exit 90 ;;
