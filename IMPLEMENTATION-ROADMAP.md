@@ -16,6 +16,21 @@ A TUI já oferece:
 - [x] Devolver o terminal à CLI para operações interativas e reativar o modo da TUI após o retorno.
 - [x] Testes Bats para criação, edição e exclusão com driver PTY determinístico; CI valida sintaxe Bash/Python e executa os seis cenários.
 
+## Política de implementação e testes
+
+**Cada função ou funcionalidade nova ou modificada deve vir acompanhada de testes comportamentais que verifiquem se a TUI respeita o fluxo planejado.** Os testes fazem parte da entrega, não são uma etapa opcional para “quando der tempo”.
+
+Para cada mudança, cubra o que for aplicável:
+- Caminho de sucesso e resultado/estado visível esperado na TUI.
+- Cancelamento, entradas inválidas e limites do fluxo.
+- Falha da CLI, status de saída e saída inesperada, garantindo que a interface não anuncie sucesso falso.
+- Argumentos exatos enviados ao mock da CLI, incluindo identidade e caminho, e ausência de flags perigosas implícitas.
+- Fluxos de teclado, confirmação, troca de tela e restauração de terminal usando Bats/PTY.
+- Sanitização de saída não confiável, ausência de segredos em argv/log/status e limpeza visual para operações sensíveis.
+- Regressões reproduzíveis: adicionar um teste que demonstre a falha antes da correção e passe depois dela.
+
+Use mocks/fixtures isolados, nunca o cofre pessoal. Inclua os testes novos no CI. Uma verificação de sintaxe, sozinha, não comprova o comportamento da TUI. Não marque uma tarefa como concluída enquanto os testes comportamentais relevantes estiverem ausentes ou falhando.
+
 ## Pendências
 
 ### P0 — Segurança e confiabilidade
@@ -29,31 +44,31 @@ A TUI já oferece:
 ### P1 — Operações essenciais de gerenciamento
 
 - [x] **Excluir entrada (`npass rm`).** A ação `d` exibe identidade/caminho, alerta sobre anexos de backup e exige digitar `sim`; chama `npass rm` sem `-f`. Testes PTY cobrem confirmação e cancelamento.
-- [ ] **Gerar senha (`npass generate`).** Oferecer escolha explícita entre criar/substituir entrada e atualizar só a senha preservando campos, OTP e notas (`--in-place`, quando suportado). Exibir claramente o destino e respeitar a confirmação da CLI.
-- [ ] **Renomear/mover entrada (`npass mv`).** Fluxo dedicado para caminho de origem e destino, validação de destino e confirmação. Distinguir movimento dentro da mesma identidade de movimento entre identidades, que recifra para os destinatários de destino.
-- [ ] **Criar identidade (`npass init`).** Formulário para ID e destinatários GPG, com validação e confirmação; não misturar administração de identidades com navegação cotidiana.
-- [ ] **Melhorar seleção e navegação de caminhos.** Navegação de diretórios, retorno consistente entre telas, estados vazios e preservação do filtro/posição quando fizer sentido.
+- [ ] **Gerar senha (`npass generate`).** Oferecer escolha explícita entre criar/substituir entrada e atualizar só a senha preservando campos, OTP e notas (`--in-place`, quando suportado). Exibir claramente o destino e respeitar a confirmação da CLI. Criar testes comportamentais para sucesso, cancelamento, destino existente e falhas da CLI.
+- [ ] **Renomear/mover entrada (`npass mv`).** Fluxo dedicado para caminho de origem e destino, validação de destino e confirmação. Distinguir movimento dentro da mesma identidade de movimento entre identidades, que recifra para os destinatários de destino. Testar ambos os tipos de movimento, cancelamento e falhas.
+- [ ] **Criar identidade (`npass init`).** Formulário para ID e destinatários GPG, com validação e confirmação; não misturar administração de identidades com navegação cotidiana. Testar entradas inválidas, cancelamento e erro da CLI.
+- [ ] **Melhorar seleção e navegação de caminhos.** Navegação de diretórios, retorno consistente entre telas, estados vazios e preservação do filtro/posição quando fizer sentido. Testar teclado e transições de estado via PTY.
 
 ### P2 — Busca e recursos de autenticação
 
-- [ ] **Busca por caminho mais completa (`npass find`).** Distinguir filtro local da lista de uma busca no store; não confundir com pesquisa do conteúdo secreto.
-- [ ] **Ações OTP separadas.** Separar “mostrar código” de “copiar código” (`npass otp clip`); não exibir URI `otpauth://` nem segredo OTP sem ação explícita.
-- [ ] **Gerenciamento de PIN (`npass pin`).** Expor escolha inequívoca entre PIN como senha (`--password`) e PIN como campo (`--field`); explicar sobrescrita e não assumir que os modos são intercambiáveis.
-- [ ] **Cadastro/atualização de OTP.** Integrar `npass otp insert` somente com fluxo interativo claro e confirmação de sobrescrita.
-- [ ] **Frases memoráveis/Diceware.** Adicionar `npass memorable` e `npass diceware`, incluindo as implicações específicas da lista pessoal e da recuperação offline do Diceware.
+- [ ] **Busca por caminho mais completa (`npass find`).** Distinguir filtro local da lista de uma busca no store; não confundir com pesquisa do conteúdo secreto. Testar resultados, nenhum resultado, cancelamento e falha.
+- [ ] **Ações OTP separadas.** Separar “mostrar código” de “copiar código” (`npass otp clip`); não exibir URI `otpauth://` nem segredo OTP sem ação explícita. Testar seleção da ação, falha e limpeza de tela.
+- [ ] **Gerenciamento de PIN (`npass pin`).** Expor escolha inequívoca entre PIN como senha (`--password`) e PIN como campo (`--field`); explicar sobrescrita e não assumir que os modos são intercambiáveis. Testar seleção de modo, confirmação e falhas.
+- [ ] **Cadastro/atualização de OTP.** Integrar `npass otp insert` somente com fluxo interativo claro e confirmação de sobrescrita. Testar cancelamento e não vazamento do segredo.
+- [ ] **Frases memoráveis/Diceware.** Adicionar `npass memorable` e `npass diceware`, incluindo as implicações específicas da lista pessoal e da recuperação offline do Diceware. Testar argumentos, erros e apresentação dos resultados.
 
 ### P3 — Recursos avançados, depois do núcleo
 
-- [ ] **Backups de recuperação (`npass backup`).** Mostrar que são anexos cifrados e que remoção/movimentação da entrada pode afetá-los.
-- [ ] **Histórico Git (`npass log`, `npass loglong`).** Navegar histórico sem sugerir que apagar uma entrada elimina versões antigas do segredo.
-- [ ] **Rotação em massa (`npass update`).** Só implementar com seleção/revisão explícita das entradas afetadas e resumo antes de gravar.
-- [ ] **Assinatura de identidade (`npass sign`) e extensões.** Exibir apenas recursos realmente disponíveis; extensões são opcionais e podem estar desabilitadas.
-- [ ] **Importação e passkeys.** Tratar como integrações avançadas/opcionais, não como pré-requisitos da TUI principal.
+- [ ] **Backups de recuperação (`npass backup`).** Mostrar que são anexos cifrados e que remoção/movimentação da entrada pode afetá-los. Testar confirmações e erros.
+- [ ] **Histórico Git (`npass log`, `npass loglong`).** Navegar histórico sem sugerir que apagar uma entrada elimina versões antigas do segredo. Testar estados vazios, navegação e falhas.
+- [ ] **Rotação em massa (`npass update`).** Só implementar com seleção/revisão explícita das entradas afetadas e resumo antes de gravar. Testar seleção, cancelamento e confirmação.
+- [ ] **Assinatura de identidade (`npass sign`) e extensões.** Exibir apenas recursos realmente disponíveis; extensões são opcionais e podem estar desabilitadas. Testar indisponibilidade e erros.
+- [ ] **Importação e passkeys.** Tratar como integrações avançadas/opcionais, não como pré-requisitos da TUI principal. Testar importação inválida, cancelamento e falhas sem alterar dados indevidamente.
 
 ### P4 — Qualidade de produto e distribuição
 
 - [ ] **Documentar todos os atalhos e fluxos no README**, incluindo estados vazios, cancelamento, erros, clipboard e requisitos.
-- [ ] **Adicionar testes de regressão por funcionalidade** e manter o CI executando-os, não apenas `bash -n`.
+- [ ] **Manter testes de regressão por funcionalidade no CI.** Cada novo comportamento ou correção deve adicionar/atualizar testes comportamentais de TUI, não apenas executar `bash -n`.
 - [ ] **Verificar acessibilidade de terminal:** terminfo sem cores, terminais pequenos, redimensionamento, UTF-8/ASCII, teclado sem setas e ausência de clipboard/OTP.
 - [ ] **Definir instalação/empacotamento** e dependências opcionais sem exigir extensões para o uso básico.
 - [ ] **Adicionar uma matriz de compatibilidade** entre versões do `npass-tui` e contratos de CLI do `npass-store`.
@@ -61,19 +76,18 @@ A TUI já oferece:
 ## Ordem recomendada
 
 1. Cobertura de testes PTY/mock e restauração do terminal.
-2. Exclusão segura.
-3. Geração de senha, com opção de preservar os demais campos.
-4. Renomeação/movimentação.
-5. Criação de identidade.
-6. Melhorias de navegação e busca.
-7. OTP/PIN/Diceware e recursos avançados.
+2. Geração de senha, com opção de preservar os demais campos.
+3. Renomeação/movimentação.
+4. Criação de identidade.
+5. Melhorias de navegação e busca.
+6. OTP/PIN/Diceware e recursos avançados.
 
 ## Critério para marcar uma tarefa como concluída
 
 Marque `[x]` somente quando:
 1. a implementação estiver no repositório;
-2. houver testes relevantes (mock/PTY quando envolver interação);
-3. a sintaxe/CI passar;
+2. houver testes comportamentais relevantes, incluindo mock/PTY quando envolver interação;
+3. os testes relevantes e a suíte completa passarem, e o CI estiver verde quando disponível;
 4. documentação e atalhos estiverem atualizados;
 5. riscos de terminal e exposição de segredos tiverem sido revisados.
 
