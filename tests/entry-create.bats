@@ -2,7 +2,7 @@
 load test_helper
 
 @test "carrega identidades e caminhos ao entrar e cria sem force" {
-  run run_tui create
+  run_tui_case create
   [ "$status" -eq 0 ]
   assert_log_has 'identities'
   assert_log_has 'ls --flat personal'
@@ -12,7 +12,7 @@ load test_helper
 }
 
 @test "caminho vazio cancela a criação" {
-  run run_tui cancel
+  run_tui_case cancel
   [ "$status" -eq 0 ]
   run grep -Eq '^insert ' "$LOG"
   [ "$status" -ne 0 ]
