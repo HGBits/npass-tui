@@ -26,9 +26,12 @@ MOCK
 run_tui() {
   local scenario="$1"
   : >"$LOG"
-  TERM=xterm NPASS_BIN="$MOCK_NPASS" NPASS_LOG="$LOG" \
+  if ! TERM=xterm NPASS_BIN="$MOCK_NPASS" NPASS_LOG="$LOG" \
     python3 "$ROOT/tests/pty_driver.py" "$scenario" "$ROOT/npass-tui" \
-    >"$PTY_OUT" 2>&1
+    >"$PTY_OUT" 2>&1; then
+    cat "$PTY_OUT" >&2
+    return 1
+  fi
 }
 
 assert_log_has() {
