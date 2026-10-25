@@ -13,8 +13,14 @@ setup() {
 set -eu
 printf '%s\n' "$*" >>"$NPASS_LOG"
 case "$1" in
-  identities) printf 'personal - 2 entries\n' ;;
-  ls) printf 'example/login\nsecond/entry\n' ;;
+  identities)
+    if [[ ${MOCK_IDENTITIES_FAIL:-0} == 1 ]]; then printf 'FAIL-SECRET-SENTINEL\n'; exit 17; fi
+    printf 'personal - 2 entries\n'
+    ;;
+  ls)
+    if [[ ${MOCK_LS_FAIL:-0} == 1 ]]; then printf 'FAIL-SECRET-SENTINEL\n'; exit 17; fi
+    printf 'example/login\nsecond/entry\n'
+    ;;
   insert|edit|rm) stty -g >>"$NPASS_TTY_LOG"; exit "${MOCK_ACTION_EXIT:-0}" ;;
   show)
     if [[ ${MOCK_SHOW_FAIL:-0} == 1 ]]; then printf 'FAIL-SECRET-SENTINEL\\n'; exit 17; fi
