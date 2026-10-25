@@ -70,7 +70,8 @@ def main():
 
     try:
         if scenario == "identities-fail":
-            read_until("Erro ao listar identidades (código 17)")
+            identity_error_end = read_until("Erro ao listar identidades (código 17)")
+            read_until("Esc voltar", after=identity_error_end)
             if b"FAIL-SECRET-SENTINEL" in output:
                 print("identity-list failure output leaked into the terminal", file=sys.stderr)
                 return 1
@@ -112,7 +113,8 @@ def main():
 
         send("\r")
         if scenario == "ls-fail":
-            read_until("Erro ao listar entradas (código 17)")
+            path_error_end = read_until("Erro ao listar entradas (código 17)")
+            read_until("Esc voltar", after=path_error_end)
             if b"FAIL-SECRET-SENTINEL" in output:
                 print("path-list failure output leaked into the terminal", file=sys.stderr)
                 return 1
