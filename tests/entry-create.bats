@@ -5,7 +5,7 @@ load test_helper
   run run_tui create
   [ "$status" -eq 0 ]
   assert_log_has 'identities'
-  assert_log_has 'tree --flat personal'
+  assert_log_has 'ls --flat personal'
   assert_log_has 'insert personal new/site'
   run grep -Eq '^insert .* (-f|--force)( |$)' "$LOG"
   [ "$status" -ne 0 ]
