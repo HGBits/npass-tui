@@ -80,6 +80,9 @@ def main():
         elif scenario == "edit":
             send("e")
             read_until("Edição concluída")
+        elif scenario == "edit-fail":
+            send("e")
+            read_until("npass edit falhou (código 17)")
         elif scenario == "delete":
             send("d")
             read_until('Digite exatamente "sim"')
