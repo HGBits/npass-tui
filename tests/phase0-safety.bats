@@ -67,3 +67,9 @@ load test_helper
   MOCK_PATH_CONTROL=1 run_tui_case path-control
   [ "$status" -eq 0 ]
 }
+
+@test "caminho com espaços é passado à CLI como um único argumento lógico" {
+  MOCK_PATH_SPACES=1 run_tui_case path-spaces
+  [ "$status" -eq 0 ]
+  assert_log_has 'clip personal dir with spaces/login entry'
+}
