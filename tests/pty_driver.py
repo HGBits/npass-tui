@@ -139,7 +139,10 @@ def main():
                 print("TUI did not exit after path-list failure", file=sys.stderr)
                 return 1
             return 0
-        read_until("example/login")
+        if scenario == "path-spaces":
+            read_until("dir with spaces/login entry")
+        else:
+            read_until("example/login")
         if scenario == "path-control":
             read_until("Esc voltar")
             if b"PWNED-PATH" in output or b"\x1b]0;PWNED-PATH\x07" in output:
@@ -156,7 +159,10 @@ def main():
                 return 1
             return 0
 
-        if scenario == "create":
+        if scenario == "path-spaces":
+            send("c")
+            read_until("Comando npass clip concluído.")
+        elif scenario == "create":
             send("a")
             read_until("Caminho da nova entrada")
             send("new/site\n")
@@ -258,9 +264,14 @@ def main():
             "delete": "Comando npass rm concluído",
             "delete-cancel": "Exclusão cancelada.",
             "control-output": "Entradas",
+            "path-spaces": "Comando npass clip concluído.",
         }[scenario]
         status_end = output.rfind(status_marker.encode("utf-8"))
         read_until("Esc voltar", after=status_end + len(status_marker.encode("utf-8")))
+        if scenario == "path-spaces":
+            # Successful clip uses show_message(), which consumes one dismissal key.
+            send("x")
+            read_until("Esc voltar", after=len(output))
         if scenario == "edit-fail":
             if termios.tcgetattr(master) != raw_tty_before_action:
                 print("TUI terminal mode was not restored after CLI failure", file=sys.stderr)

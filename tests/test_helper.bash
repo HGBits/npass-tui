@@ -21,6 +21,8 @@ case "$1" in
     if [[ ${MOCK_LS_FAIL:-0} == 1 ]]; then printf 'FAIL-SECRET-SENTINEL\n'; exit 17; fi
     if [[ ${MOCK_PATH_CONTROL:-0} == 1 ]]; then
       printf 'example/login\033]0;PWNED-PATH\007\nsecond/entry\n'
+    elif [[ ${MOCK_PATH_SPACES:-0} == 1 ]]; then
+      printf 'dir with spaces/login entry\nsecond/entry\n'
     else
       printf 'example/login\nsecond/entry\n'
     fi
@@ -58,6 +60,7 @@ run_tui() {
     MOCK_IDENTITIES_FAIL="${MOCK_IDENTITIES_FAIL:-0}" \
     MOCK_LS_FAIL="${MOCK_LS_FAIL:-0}" \
     MOCK_PATH_CONTROL="${MOCK_PATH_CONTROL:-0}" \
+    MOCK_PATH_SPACES="${MOCK_PATH_SPACES:-0}" \
     MOCK_CLIP_FAIL="${MOCK_CLIP_FAIL:-0}" \
     MOCK_OTP_FAIL="${MOCK_OTP_FAIL:-0}" \
     MOCK_ACTION_EXIT="${MOCK_ACTION_EXIT:-0}" \
