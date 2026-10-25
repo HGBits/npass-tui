@@ -268,6 +268,10 @@ def main():
         }[scenario]
         status_end = output.rfind(status_marker.encode("utf-8"))
         read_until("Esc voltar", after=status_end + len(status_marker.encode("utf-8")))
+        if scenario == "path-spaces":
+            # Successful clip uses show_message(), which consumes one dismissal key.
+            send("x")
+            read_until("Esc voltar", after=len(output))
         if scenario == "edit-fail":
             if termios.tcgetattr(master) != raw_tty_before_action:
                 print("TUI terminal mode was not restored after CLI failure", file=sys.stderr)
