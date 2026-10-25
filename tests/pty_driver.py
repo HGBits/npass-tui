@@ -72,6 +72,15 @@ def main():
         if scenario == "signal-term":
             os.kill(proc.pid, signal.SIGTERM)
             return_code = proc.wait(timeout=max(0.1, deadline - time.monotonic()))
+            # Drain cleanup output before asserting cursor restoration.
+            while select.select([master], [], [], 0.05)[0]:
+                try:
+                    chunk = os.read(master, 8192)
+                except OSError:
+                    break
+                if not chunk:
+                    break
+                output.extend(chunk)
             restored_tty = termios.tcgetattr(master)
             if return_code != 143:
                 print("expected exit status 143 after SIGTERM, got", return_code, file=sys.stderr)
@@ -138,7 +147,7 @@ def main():
             "delete-cancel": "Exclusão cancelada.",
             "control-output": "Entradas",
         }[scenario]
-        status_end = output.find(status_marker.encode("utf-8"))
+        status_end = output.rfind(status_marker.encode("utf-8"))
         read_until("Esc voltar", after=status_end + len(status_marker.encode("utf-8")))
         # In the entries screen, q returns to the identity list; it does not
         # exit the application. Send q once to go back, then once more to exit.
