@@ -202,13 +202,16 @@ def main():
         elif scenario == "control-output":
             send("\r")
             read_until("Conteúdo da entrada")
-            read_until("safe-line")
+            preview_content_end = read_until("safe-line")
             if b"PWNED-TITLE" in output or b"\x1b[?9999h" in output:
                 print("untrusted CLI control sequence reached the terminal", file=sys.stderr)
                 return 1
             send("q")
             before_entries = len(output)
             entries_end = read_until("Entradas", after=before_entries)
+            if b"\x1b[H\x1b[2J" not in output[preview_content_end:entries_end]:
+                print("preview screen was not cleared when leaving it", file=sys.stderr)
+                return 1
             read_until("Esc voltar", after=entries_end)
         else:
             raise ValueError("unknown scenario: " + scenario)
