@@ -30,14 +30,29 @@ Este repositório contém uma interface de terminal (TUI) em Bash para o `npass`
 9. Não suponha que extensões opcionais estejam instaladas ou habilitadas. Detecte indisponibilidade e mostre uma mensagem clara.
 10. A TUI não deve afirmar que uma operação é segura só porque a interface a escondeu. Limpe previews e códigos secretos da tela quando sair deles ou após ações sensíveis, sempre que viável.
 
+## Política obrigatória de testes
+
+**Toda função ou funcionalidade nova ou alterada precisa de testes comportamentais que verifiquem a TUI, não apenas a função isolada ou a sintaxe do Bash.** Os testes fazem parte da implementação e devem ser escritos junto com o código, no mesmo conjunto de mudanças.
+
+- Teste o fluxo normal e o resultado visível/estado esperado da interface.
+- Teste cancelamento e entradas inválidas quando aplicáveis.
+- Teste falha da CLI, códigos de saída não zero e saída inesperada; confirme que a TUI não anuncia sucesso indevidamente.
+- Verifique os argumentos exatos passados à CLI simulada, incluindo identidade/caminho, e confirme que flags perigosas como `-f` não são acrescentadas implicitamente.
+- Para fluxos interativos, teclado, confirmações, alternância de tela ou estado do terminal, prefira testes Bats com o driver PTY determinístico.
+- Para conteúdo não confiável, segredos ou operações sensíveis, teste sanitização, ausência de vazamento em argv/log/status e limpeza/restauração pertinente.
+- Use mocks/fixtures isolados. **Nunca use o cofre pessoal em testes automatizados.**
+- Toda regressão encontrada deve ganhar um teste que falhe antes da correção e passe depois dela, sempre que reproduzível.
+- Inclua os novos testes no CI. Não marque uma tarefa concluída se a cobertura comportamental correspondente estiver faltando ou falhando.
+
 ## Fluxo de desenvolvimento
 
 1. Leia este arquivo e a seção correspondente de `IMPLEMENTATION-ROADMAP.md`.
 2. Inspecione apenas o trecho de `npass-tui` e os testes relacionados à mudança.
-3. Adicione/atualize testes com um executável `npass` simulado; não use o cofre real em testes automatizados.
-4. Valide sintaxe com `bash -n npass-tui` e execute os testes disponíveis no repositório/CI.
-5. Atualize `README.md` e o roadmap quando atalhos ou comportamentos mudarem.
-6. Não declare testes interativos aprovados se só foi validada a sintaxe. Testes com PTY/mock não substituem validação manual em terminal real.
+3. Antes ou junto da implementação, defina os comportamentos esperados e escreva/atualize os testes com um executável `npass` simulado.
+4. Implemente a menor alteração que satisfaça os testes, sem ampliar o escopo sem necessidade.
+5. Valide sintaxe com `bash -n npass-tui` e execute os testes relevantes; execute a suíte completa e o CI quando possível.
+6. Atualize `README.md` e o roadmap quando atalhos ou comportamentos mudarem.
+7. Não declare testes interativos aprovados se só foi validada a sintaxe. Testes com PTY/mock não substituem validação manual em terminal real.
 
 ## Segurança e UX
 
