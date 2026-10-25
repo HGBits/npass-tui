@@ -46,6 +46,16 @@ run_tui() {
         printf 'a'; sleep 0.05
         printf '\n'; sleep 0.15
         printf 'q' ;;
+      delete)
+        printf '\\r'; sleep 0.10
+        printf 'd'; sleep 0.10
+        printf 'sim\\n'; sleep 0.20
+        printf 'q' ;;
+      delete-cancel)
+        printf '\\r'; sleep 0.10
+        printf 'd'; sleep 0.10
+        printf 'nao\\n'; sleep 0.20
+        printf 'q' ;;
       *) echo "unknown test scenario: $scenario" >&2; return 2 ;;
     esac
   } | TERM=xterm NPASS_BIN="$MOCK_NPASS" NPASS_LOG="$LOG" \
