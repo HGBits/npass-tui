@@ -6,7 +6,7 @@ Interface de terminal em **Bash** para o [`npass`](https://github.com/HGBits/npa
 
 - Bash 4.3+
 - `tput` e `stty` (normalmente fornecidos por ncurses/coreutils/util-linux, conforme a distribuição)
-- `npass` instalado e configurado conforme a documentação do projeto
+- `npass-store` **2.8** instalado e configurado conforme a documentação do projeto (versão-alvo de compatibilidade da TUI)
 - Terminal interativo com suporte a terminfo
 
 Não depende de Python, `dialog`, `fzf` ou `gum`.
