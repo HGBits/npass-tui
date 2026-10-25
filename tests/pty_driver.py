@@ -110,6 +110,12 @@ def main():
         }[scenario]
         status_end = output.find(status_marker.encode("utf-8"))
         read_until("Esc voltar", after=status_end + len(status_marker.encode("utf-8")))
+        # In the entries screen, q returns to the identity list; it does not
+        # exit the application. Send q once to go back, then once more to exit.
+        before_back = len(output)
+        send("q")
+        identity_title_end = read_until("Escolha uma identidade", after=before_back)
+        read_until("Esc voltar", after=identity_title_end)
         send("q")
         remaining = max(0, deadline - time.monotonic())
         try:
