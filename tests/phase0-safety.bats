@@ -62,3 +62,8 @@ load test_helper
   run_tui_case exit-cleanup
   [ "$status" -eq 0 ]
 }
+
+@test "caminho listado com sequência de controle é sanitizado antes de renderizar" {
+  MOCK_PATH_CONTROL=1 run_tui_case path-control
+  [ "$status" -eq 0 ]
+}

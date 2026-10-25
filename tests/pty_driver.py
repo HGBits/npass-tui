@@ -140,6 +140,21 @@ def main():
                 return 1
             return 0
         read_until("example/login")
+        if scenario == "path-control":
+            read_until("Esc voltar")
+            if b"PWNED-PATH" in output or b"\x1b]0;PWNED-PATH\x07" in output:
+                print("untrusted path control sequence reached the terminal", file=sys.stderr)
+                return 1
+            send("q")
+            before_identity = len(output)
+            identity_end = read_until("Escolha uma identidade", after=before_identity)
+            read_until("Esc voltar", after=identity_end)
+            send("q")
+            return_code = proc.wait(timeout=max(0.1, deadline - time.monotonic()))
+            if return_code != 0:
+                print("TUI did not exit after path-control scenario", file=sys.stderr)
+                return 1
+            return 0
 
         if scenario == "create":
             send("a")
