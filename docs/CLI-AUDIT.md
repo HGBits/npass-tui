@@ -152,7 +152,7 @@ Regras críticas:
 
 Ordem recomendada após a auditoria:
 
-1. Verificar a implementação atual da TUI contra os contratos `tree --flat` e `show --raw`; adicionar testes de parsing e sanitização.
+1. Para a CLI atual 2.8, verificar a implementação da TUI contra `ls --flat` e `show --raw`; adicionar testes de parsing e sanitização. `tree --flat` só descreve o snapshot histórico 2.5.
 2. Criar entrada usando `npass insert`, respeitando a interação oculta e a confirmação nativa de sobrescrita.
 3. Integrar `npass edit` com restauração completa do terminal.
 4. Implementar exclusão com confirmação que mencione anexos de backup.
@@ -167,7 +167,7 @@ Executado sobre o snapshot reenviado:
 - `bash -n lib/*.bash` passou.
 - `bash -n build.sh install.sh extensions/npass-import extensions/npass-audit` passou.
 - O build passou com `bash build.sh`, gerando `bin/npass` no diretório temporário de auditoria.
-- Smoke tests do binário gerado: `npass help` e `npass tree --help` retornaram 0; `npass show --help` retornou 1 com `opção desconhecida`, confirmando que `show` não oferece `--help` próprio neste snapshot.
+- Smoke tests do binário gerado no snapshot 2.5: `npass help` e `npass tree --help` retornaram 0; `npass show --help` retornou 1 com `opção desconhecida`, confirmando que `show` não oferece `--help` próprio nessa versão. Isso não valida o contrato da CLI 2.8.
 - O comando `bats` não está instalado neste ambiente; por isso a suíte de 27 arquivos Bats **não foi executada**. Não declarar a suíte aprovada.
 - Não houve integração interativa com um cofre real nem teste em terminal PTY nesta fase.
 - O ZIP declara versão 2.5 no README, mas não fornece uma referência Git imutável (commit/hash) que permita identificar seu commit de origem. Esta nota documenta o snapshot enviado, não uma afirmação de que o branch público atual seja idêntico.
@@ -176,7 +176,7 @@ Executado sobre o snapshot reenviado:
 
 **Fase 1 encerrada:** os contratos públicos relevantes para a TUI foram mapeados a partir do snapshot correto, as operações e efeitos colaterais estão documentados, e os riscos de terminal/segredos foram convertidos em requisitos de implementação.
 
-Não foram implementadas operações novas da TUI nesta fase. A próxima fase deve começar pela revisão da TUI atual e pelos testes de mock, depois seguir com `insert` e `edit`. O GitHub público do npass continua sendo referência histórica/secundária enquanto estiver divergente do ZIP fornecido.
+Não foram implementadas operações novas da TUI nesta fase. A próxima fase deve começar pela revisão da TUI atual e pelos testes de mock, depois seguir com `insert` e `edit`. O ZIP continua sendo a referência histórica para afirmar o comportamento da versão 2.5; para integração com a CLI pública atual, usar o contrato verificado no repositório `npass-store` 2.8. Não misturar os dois contratos sem compatibilidade explícita.
 
 
 ## 10. Fase 2: criação e edição na TUI
