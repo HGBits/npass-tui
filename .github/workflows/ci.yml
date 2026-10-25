@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install Bats and PTY utilities
+      - name: Install Bats
         run: |
           sudo apt-get update
           sudo apt-get install --yes bats
