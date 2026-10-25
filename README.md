@@ -33,15 +33,16 @@ NPASS_BIN="$HOME/.local/bin/npass" ./npass-tui
 - `o`: consultar OTP via `npass otp`
 - `a`: criar entrada, informando o caminho; o próprio `npass insert` solicita a senha duas vezes sem eco e confirma antes de sobrescrever
 - `e`: editar a entrada selecionada com `npass edit` e o editor definido em `$EDITOR`
+- `d`: excluir a entrada selecionada; exige digitar `sim`, avisa sobre anexos de backup e mantém a confirmação nativa do `npass rm`
 - `Esc`: voltar
 - `q`: voltar ou sair
 
 ## Segurança e escopo
 
-- Identidades são obtidas por `npass identities`; caminhos por `npass tree --flat ID`.
+- Identidades são obtidas por `npass identities`; caminhos por `npass ls --flat ID`.
 - O conteúdo é obtido apenas quando solicitado, via `npass show --raw ID CAMINHO`.
 - A TUI não grava segredos em arquivos temporários nem implementa o formato de armazenamento do npass.
-- A TUI delega criação e edição à CLI do `npass`; não implementa armazenamento nem parsing de escrita próprio. Exclusão, movimentação e geração ainda não fazem parte da interface.
+- A TUI delega criação, edição e exclusão à CLI do `npass`; não implementa armazenamento nem parsing de escrita próprio. Movimentação e geração ainda não fazem parte da interface.
 - O conteúdo exibido fica na memória do processo e pode ser capturado por gravação de terminal ou visto por alguém com acesso à tela. Use em uma sessão confiável.
 
 ## Estado

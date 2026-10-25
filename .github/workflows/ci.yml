@@ -10,15 +10,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install Bats and PTY utilities
+      - name: Install Bats
         run: |
           sudo apt-get update
-          sudo apt-get install --yes bats util-linux
+          sudo apt-get install --yes bats
       - name: Check Bash syntax
         run: |
           bash -n npass-tui
           bash -n tests/test_helper.bash
+          python3 -m py_compile tests/pty_driver.py
       - name: Validate Bats test files
         run: bats --count tests/*.bats
       - name: Run Bats tests
-        run: bats tests/*.bats
+        run: timeout 90s bats tests/*.bats
