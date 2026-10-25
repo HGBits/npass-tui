@@ -107,8 +107,14 @@ set_status() {
 }
 
 load_identities() {
-    local output line ident
-    output=$("$NPASS_BIN" identities 2>&1) || { set_status "Erro ao listar identidades: $output"; return 1; }
+    local output line ident rc
+    if output=$("$NPASS_BIN" identities 2>&1); then
+        :
+    else
+        rc=$?
+        set_status "Erro ao listar identidades (código $rc)."
+        return 1
+    fi
     IDENTITIES=()
     while IFS= read -r line; do
         [[ -z ${line//[[:space:]]/} ]] && continue
@@ -127,13 +133,19 @@ load_identities() {
 }
 
 load_paths() {
-    local output line
+    local output line rc
     # Never leave paths from the previous identity selectable after an error.
     PATHS=()
     VISIBLE=()
     CURSOR=0
     OFFSET=0
-    output=$("$NPASS_BIN" ls --flat "$CURRENT_ID" 2>&1) || { set_status "Erro ao listar entradas: $output"; return 1; }
+    if output=$("$NPASS_BIN" ls --flat "$CURRENT_ID" 2>&1); then
+        :
+    else
+        rc=$?
+        set_status "Erro ao listar entradas (código $rc)."
+        return 1
+    fi
     PATHS=()
     while IFS= read -r line; do [[ -n $line ]] && PATHS+=("$line"); done <<< "$output"
     rebuild_visible
@@ -219,26 +231,45 @@ show_message() {
 }
 
 run_action() {
-    local action=$1 path=$2 output
+    local action=$1 path=$2 output rc
     case $action in
         clip)
-            output=$("$NPASS_BIN" clip "$CURRENT_ID" "$path" 2>&1) || { show_message "Falha ao copiar: $output"; return; }
-            show_message 'Comando npass clip concluído.' ;;
+            if output=$("$NPASS_BIN" clip "$CURRENT_ID" "$path" 2>&1); then
+                show_message 'Comando npass clip concluído.'
+            else
+                rc=$?
+                show_message "Falha ao copiar (código $rc)."
+            fi
+            return ;;
         otp)
-            output=$("$NPASS_BIN" otp "$CURRENT_ID" "$path" 2>&1) || { show_message "Falha ao obter OTP: $output"; return; }
+            if output=$("$NPASS_BIN" otp "$CURRENT_ID" "$path" 2>&1); then
+                :
+            else
+                rc=$?
+                show_message "Falha ao obter OTP (código $rc)."
+                return
+            fi
             PREVIEW_LINES=()
             while IFS= read -r line; do PREVIEW_LINES+=("$line"); done <<< "$output"
             SCREEN=preview
             set_status "OTP de $path (qualquer tecla volta)"
             render_preview
             IFS= read -r -s -n 1
-            SCREEN=entries ;;
+            SCREEN=entries
+            PREVIEW_LINES=()
+            PREVIEW_OFFSET=0 ;;
     esac
 }
 
 open_preview() {
-    local path=$1 content line
-    content=$("$NPASS_BIN" show --raw "$CURRENT_ID" "$path" 2>&1) || { show_message "Erro ao abrir entrada: $content"; return; }
+    local path=$1 content line rc
+    if content=$("$NPASS_BIN" show --raw "$CURRENT_ID" "$path" 2>&1); then
+        :
+    else
+        rc=$?
+        show_message "Erro ao abrir entrada (código $rc)."
+        return
+    fi
     PREVIEW_LINES=()
     while IFS= read -r line; do PREVIEW_LINES+=("$line"); done <<< "$content"
     SCREEN=preview
@@ -362,8 +393,10 @@ main_loop() {
             identities:enter)
                 if (("${#IDENTITIES[@]}" > 0)); then
                     CURRENT_ID=${IDENTITIES[CURSOR]}
-                    SCREEN=entries; QUERY=''; load_paths || true
-                    set_status 'Enter abrir  c copiar senha  o OTP  / filtrar  Esc voltar'
+                    SCREEN=entries; QUERY=''
+                    if load_paths; then
+                        set_status 'Enter abrir  c copiar senha  o OTP  / filtrar  Esc voltar'
+                    fi
                 fi ;;
             entries:quit|entries:back) SCREEN=identities; QUERY=''; set_status 'Escolha uma identidade.' ;;
             entries:up) (( CURSOR > 0 )) && ((CURSOR--)) ;;
@@ -380,7 +413,10 @@ main_loop() {
             entries:enter) if (("${#VISIBLE[@]}" > 0)); then open_preview "${VISIBLE[CURSOR]}"; fi ;;
             entries:clip) if (("${#VISIBLE[@]}" > 0)); then run_action clip "${VISIBLE[CURSOR]}"; fi ;;
             entries:otp) if (("${#VISIBLE[@]}" > 0)); then run_action otp "${VISIBLE[CURSOR]}"; fi ;;
-            preview:quit|preview:back) SCREEN=entries ;;
+            preview:quit|preview:back)
+                SCREEN=entries
+                PREVIEW_LINES=()
+                PREVIEW_OFFSET=0 ;;
             preview:up) (( PREVIEW_OFFSET > 0 )) && ((PREVIEW_OFFSET--)) ;;
             preview:down) (( PREVIEW_OFFSET + 1 < ${#PREVIEW_LINES[@]} )) && ((PREVIEW_OFFSET++)) ;;
             preview:clip) run_action clip "${VISIBLE[CURSOR]}" ;;
