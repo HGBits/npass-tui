@@ -24,7 +24,7 @@ A TUI já oferece:
 - [ ] **Validar a integração real com terminal e cofre de teste.** Testar manualmente `insert`, `edit`, preview, clipboard e OTP em pelo menos um terminal compatível; não usar o cofre pessoal como fixture.
 - [ ] **Revisar limpeza visual de segredos.** Ao sair do preview ou após exibir OTP, limpar/redesenhar a tela quando apropriado e evitar manter conteúdo secreto em status ou mensagens duradouras.
 - [ ] **Tratar nomes/caminhos e saída inesperada da CLI de forma robusta.** Não depender de parsing frágil da saída humana; validar nomes e falhas sem esconder erros de descriptografia.
-- [ ] **Confirmar compatibilidade de versão da CLI.** A documentação histórica em `docs/CLI-AUDIT.md` menciona contratos de snapshots anteriores. O npass-store público atual documenta `npass ls --flat ID`; a implementação deve confirmar a CLI instalada e manter mensagens de erro úteis.
+- [x] **Confirmar contrato de listagem da CLI.** A TUI usa `npass ls --flat ID`, conforme o contrato atual documentado em npass-store, em vez do comando legado `tree`.
 
 ### P1 — Operações essenciais de gerenciamento
 
