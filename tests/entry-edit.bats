@@ -7,7 +7,7 @@ load test_helper
   assert_log_has 'edit personal example/login'
 }
 
-@test "falha da CLI nao encerra a TUI nem fica presa no pseudo-terminal" {
+@test "falha da CLI restaura o modo da TUI e entrega o terminal normal ao comando" {
   MOCK_ACTION_EXIT=17 run_tui_case edit-fail
   [ "$status" -eq 0 ]
   assert_log_has 'edit personal example/login'

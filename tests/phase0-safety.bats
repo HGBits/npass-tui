@@ -11,3 +11,11 @@ load test_helper
   run_tui_case signal-term
   [ "$status" -eq 0 ]
 }
+
+@test "OTP fica no preview explícito, não no status nem no log de argumentos" {
+  run_tui_case otp-secret
+  [ "$status" -eq 0 ]
+  assert_log_has 'otp personal example/login'
+  run grep -Fq 'OTP-SENTINEL-123456' "$LOG"
+  [ "$status" -ne 0 ]
+}

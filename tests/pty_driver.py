@@ -26,6 +26,7 @@ def main():
     master, slave = pty.openpty()
     fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 24, 100, 0, 0))
     original_tty = termios.tcgetattr(slave)
+    original_stty = subprocess.check_output(["stty", "-g"], stdin=slave).strip()
     env = os.environ.copy()
     env["TERM"] = "xterm"
     proc = subprocess.Popen(
@@ -40,6 +41,7 @@ def main():
     os.close(slave)
     output = bytearray()
     deadline = time.monotonic() + 10
+    raw_tty_before_action = None
 
     def read_until(marker, timeout=3, after=0):
         end = min(time.monotonic() + timeout, deadline)
@@ -113,6 +115,7 @@ def main():
             send("e")
             read_until("Edição concluída")
         elif scenario == "edit-fail":
+            raw_tty_before_action = termios.tcgetattr(master)
             send("e")
             read_until("npass edit falhou (código 17)")
         elif scenario == "delete":
@@ -125,6 +128,20 @@ def main():
             read_until('Digite exatamente "sim"')
             send("nao\n")
             read_until("Exclusão cancelada.")
+        elif scenario == "otp-secret":
+            send("o")
+            secret = b"OTP-SENTINEL-123456"
+            secret_end = read_until(secret.decode("ascii"))
+            status_marker = b"OTP de example/login"
+            read_until(status_marker.decode("ascii"), after=secret_end)
+            status_start = output.rfind(status_marker)
+            if output.find(secret, status_start) >= 0:
+                print("OTP value appeared in the TUI status text", file=sys.stderr)
+                return 1
+            send("q")
+            before_entries = len(output)
+            entries_end = read_until("Entradas", after=before_entries)
+            read_until("Esc voltar", after=entries_end)
         elif scenario == "control-output":
             send("\r")
             read_until("Conteúdo da entrada")
@@ -146,12 +163,26 @@ def main():
             "cancel": "Criação cancelada.",
             "edit": "Edição concluída",
             "edit-fail": "npass edit falhou (código 17)",
+            "otp-secret": "Entradas",
             "delete": "Comando npass rm concluído",
             "delete-cancel": "Exclusão cancelada.",
             "control-output": "Entradas",
         }[scenario]
         status_end = output.rfind(status_marker.encode("utf-8"))
         read_until("Esc voltar", after=status_end + len(status_marker.encode("utf-8")))
+        if scenario == "edit-fail":
+            if termios.tcgetattr(master) != raw_tty_before_action:
+                print("TUI terminal mode was not restored after CLI failure", file=sys.stderr)
+                return 1
+            tty_log = os.environ.get("NPASS_TTY_LOG")
+            if not tty_log or not os.path.exists(tty_log):
+                print("interactive CLI terminal-mode log is missing", file=sys.stderr)
+                return 1
+            with open(tty_log, "rb") as stream:
+                cli_tty = stream.read().strip()
+            if cli_tty != original_stty:
+                print("interactive CLI did not receive the original terminal mode", file=sys.stderr)
+                return 1
         # In the entries screen, q returns to the identity list; it does not
         # exit the application. Send q once to go back, then once more to exit.
         before_back = len(output)
