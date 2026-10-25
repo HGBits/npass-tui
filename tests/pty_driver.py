@@ -70,6 +70,9 @@ def main():
         read_until("personal")
 
         if scenario == "signal-term":
+            # Wait for the first frame/footer so the signal arrives while the
+            # main loop is idle in read_key(), not halfway through rendering.
+            read_until("Esc voltar")
             os.kill(proc.pid, signal.SIGTERM)
             return_code = proc.wait(timeout=max(0.1, deadline - time.monotonic()))
             # Drain cleanup output before asserting cursor restoration.
