@@ -30,9 +30,9 @@ Este repositório contém uma interface de terminal (TUI) em Bash para o `npass`
 9. Não suponha que extensões opcionais estejam instaladas ou habilitadas. Detecte indisponibilidade e mostre uma mensagem clara.
 10. A TUI não deve afirmar que uma operação é segura só porque a interface a escondeu. Limpe previews e códigos secretos da tela quando sair deles ou após ações sensíveis, sempre que viável.
 
-## Política obrigatória de testes
+## Requisito obrigatório para toda IA/agente: testes comportamentais
 
-**Toda função ou funcionalidade nova ou alterada precisa de testes comportamentais que verifiquem a TUI, não apenas a função isolada ou a sintaxe do Bash.** Os testes fazem parte da implementação e devem ser escritos junto com o código, no mesmo conjunto de mudanças.
+**Esta regra se aplica a qualquer IA, agente automatizado ou pessoa que implemente, altere ou corrija código neste repositório. Não é uma sugestão nem pode ser ignorada por conveniência, falta de tempo ou por a alteração parecer pequena.** Toda função, comportamento ou funcionalidade nova ou modificada DEVE incluir testes comportamentais que verifiquem a TUI e confirmem que ela respeita o fluxo planejado, não apenas testes unitários isolados ou uma verificação de sintaxe Bash. Os testes devem ser criados ou atualizados junto com a implementação, no mesmo conjunto de mudanças. Se não for possível executar os testes, o agente deve informar isso explicitamente e não declarar a tarefa concluída.
 
 - Teste o fluxo normal e o resultado visível/estado esperado da interface.
 - Teste cancelamento e entradas inválidas quando aplicáveis.
