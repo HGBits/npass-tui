@@ -84,12 +84,23 @@ def main():
 
         read_until("personal")
 
-        if scenario == "signal-term":
-            # Wait for the first frame/footer so the signal arrives while the
-            # main loop is idle in read_key(), not halfway through rendering.
+        signal_scenarios = {
+            "signal-term": (signal.SIGTERM, 143, "SIGTERM"),
+            "signal-int": (signal.SIGINT, 130, "SIGINT"),
+            "signal-hup": (signal.SIGHUP, 129, "SIGHUP"),
+        }
+        if scenario in signal_scenarios or scenario == "exit-cleanup":
+            # Wait for a complete frame so cleanup is tested while idle in read_key().
             read_until("Esc voltar")
-            os.kill(proc.pid, signal.SIGTERM)
-            return_code = proc.wait(timeout=max(0.1, deadline - time.monotonic()))
+            if scenario == "exit-cleanup":
+                send("q")
+                return_code = proc.wait(timeout=max(0.1, deadline - time.monotonic()))
+                expected_code = 0
+                signal_name = "normal exit"
+            else:
+                signal_number, expected_code, signal_name = signal_scenarios[scenario]
+                os.kill(proc.pid, signal_number)
+                return_code = proc.wait(timeout=max(0.1, deadline - time.monotonic()))
             # Drain cleanup output before asserting cursor restoration.
             while select.select([master], [], [], 0.05)[0]:
                 try:
@@ -100,14 +111,14 @@ def main():
                     break
                 output.extend(chunk)
             restored_tty = termios.tcgetattr(master)
-            if return_code != 143:
-                print("expected exit status 143 after SIGTERM, got", return_code, file=sys.stderr)
+            if return_code != expected_code:
+                print(f"expected exit status {expected_code} after {signal_name}, got {return_code}", file=sys.stderr)
                 return 1
             if restored_tty != original_tty:
-                print("terminal attributes were not restored after SIGTERM", file=sys.stderr)
+                print(f"terminal attributes were not restored after {signal_name}", file=sys.stderr)
                 return 1
             if b"\x1b[?25h" not in output:
-                print("cursor-show sequence missing during cleanup", file=sys.stderr)
+                print(f"cursor-show sequence missing after {signal_name}", file=sys.stderr)
                 return 1
             return 0
 
