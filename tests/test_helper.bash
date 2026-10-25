@@ -21,6 +21,8 @@ case "$1" in
     if [[ ${MOCK_LS_FAIL:-0} == 1 ]]; then printf 'FAIL-SECRET-SENTINEL\n'; exit 17; fi
     if [[ ${MOCK_PATH_CONTROL:-0} == 1 ]]; then
       printf 'example/login\033]0;PWNED-PATH\007\nsecond/entry\n'
+    elif [[ ${MOCK_PATH_SPACES:-0} == 1 ]]; then
+      printf 'dir with spaces/login entry\nsecond/entry\n'
     else
       printf 'example/login\nsecond/entry\n'
     fi
