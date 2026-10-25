@@ -28,7 +28,7 @@ TTY_STATE=$(stty -g)
 SCREEN=identities
 CURRENT_ID=''
 QUERY=''
-STATUS='↑/↓ navegar  Enter abrir  a nova entrada  e editar  c copiar  o OTP  q sair'
+STATUS='↑/↓ navegar  Enter abrir  a nova entrada  e editar  d excluir  c copiar  o OTP  q sair'
 CURSOR=0
 OFFSET=0
 IDENTITIES=()
@@ -73,6 +73,7 @@ read_key() {
         k) REPLY=up ;;
         a|A) REPLY=add ;;
         e|E) REPLY=edit ;;
+        d|D) REPLY=delete ;;
         c|C) REPLY=clip ;;
         o|O) REPLY=otp ;;
         /) REPLY=search ;;
@@ -167,7 +168,7 @@ footer() {
     put "$row" 0 "$STATUS" "$COLS"
     printf '%s' "$RESET"
     clear_line $((ROWS - 1))
-    put $((ROWS - 1)) 0 '↑/↓ navegar  Enter abrir  a criar  e editar  / filtrar  c copiar  o OTP  Esc voltar  q sair' "$COLS"
+    put $((ROWS - 1)) 0 '↑/↓ navegar  Enter abrir  a criar  e editar  d excluir  / filtrar  c copiar  o OTP  Esc voltar  q sair' "$COLS"
 }
 
 render_list() {
@@ -271,6 +272,25 @@ search_prompt() {
     set_status "Filtro aplicado: ${QUERY:-nenhum}"
 }
 
+confirm_delete() {
+    local path=$1 answer
+    stty "$TTY_STATE"
+    tput cnorm 2>/dev/null || true
+    tput sgr0 2>/dev/null || true
+    tput clear 2>/dev/null || true
+    printf 'EXCLUIR ENTRADA\n\nIdentidade: %s\nCaminho:    %s\n\n' "$CURRENT_ID" "$path"
+    printf 'A CLI também pode remover anexos de backup desta entrada.\n'
+    printf 'Digite exatamente "sim" para continuar (qualquer outra resposta cancela): '
+    IFS= read -r answer || answer=''
+    raw_mode
+    if [[ $answer == sim ]]; then
+        REPLY=$path
+        return 0
+    fi
+    set_status 'Exclusão cancelada.'
+    return 1
+}
+
 prompt_path() {
     local input
     stty "$TTY_STATE"
@@ -295,19 +315,20 @@ run_interactive_npass() {
     stty "$TTY_STATE"
     tput cnorm 2>/dev/null || true
     tput sgr0 2>/dev/null || true
-    if [[ $action == insert ]]; then
-        "$NPASS_BIN" insert "$CURRENT_ID" "$path"
-        rc=$?
-    else
-        "$NPASS_BIN" edit "$CURRENT_ID" "$path"
-        rc=$?
-    fi
+    case $action in
+        insert) "$NPASS_BIN" insert "$CURRENT_ID" "$path"; rc=$? ;;
+        edit)   "$NPASS_BIN" edit "$CURRENT_ID" "$path"; rc=$? ;;
+        rm)     "$NPASS_BIN" rm "$CURRENT_ID" "$path"; rc=$? ;;
+        *)      rc=2 ;;
+    esac
     raw_mode
     if (( rc == 0 )); then
         if [[ $action == insert ]]; then
             set_status "Entrada enviada ao npass: $path"
-        else
+        elif [[ $action == edit ]]; then
             set_status "Edição concluída: $path"
+        else
+            set_status "Comando npass rm concluído: $path"
         fi
     else
         set_status "npass $action falhou (código $rc): $path"
@@ -339,6 +360,10 @@ main_loop() {
                 if prompt_path; then run_interactive_npass insert "$REPLY"; fi ;;
             entries:edit)
                 if (( ${#VISIBLE[@]} > 0 )); then run_interactive_npass edit "${VISIBLE[CURSOR]}"; fi ;;
+            entries:delete)
+                if (( ${#VISIBLE[@]} > 0 )) && confirm_delete "${VISIBLE[CURSOR]}"; then
+                    run_interactive_npass rm "$REPLY"
+                fi ;;
             entries:enter) if (("${#VISIBLE[@]}" > 0)); then open_preview "${VISIBLE[CURSOR]}"; fi ;;
             entries:clip) if (("${#VISIBLE[@]}" > 0)); then run_action clip "${VISIBLE[CURSOR]}"; fi ;;
             entries:otp) if (("${#VISIBLE[@]}" > 0)); then run_action otp "${VISIBLE[CURSOR]}"; fi ;;
