@@ -47,3 +47,18 @@ load test_helper
   [ "$status" -eq 0 ]
   assert_log_has 'otp personal example/login'
 }
+
+@test "SIGINT restaura o terminal e mostra o cursor" {
+  run_tui_case signal-int
+  [ "$status" -eq 0 ]
+}
+
+@test "SIGHUP restaura o terminal e mostra o cursor" {
+  run_tui_case signal-hup
+  [ "$status" -eq 0 ]
+}
+
+@test "saída normal restaura os atributos do terminal e mostra o cursor" {
+  run_tui_case exit-cleanup
+  [ "$status" -eq 0 ]
+}
