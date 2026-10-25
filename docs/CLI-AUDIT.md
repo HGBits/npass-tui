@@ -5,9 +5,13 @@ Data da auditoria: 2026-10-24
 
 ## 1. Fonte de verdade e escopo
 
-A fonte autoritativa desta auditoria é o arquivo `projeto(2).zip` reenviado pelo usuário nesta conversa. **Esse snapshot prevalece sobre o GitHub público, que o usuário identificou como antigo.** Não inferir contratos atuais a partir do repositório público nem usar diferenças com ele como defeitos da versão atual.
+Esta auditoria foi originalmente escrita contra o arquivo `projeto(2).zip`, que identifica a versão **npass 2.5**. As conclusões abaixo sobre essa versão são históricas e não devem ser tratadas como contrato universal.
 
-O ZIP contém 91 entradas, incluindo README, `lib/`, `extensions/`, `tests/`, documentação de manpages e o helper Rust de passkeys. O README incluído identifica o projeto como npass 2.5. O executável `bin/npass` é gerado por `build.sh`; não é fonte primária e não veio no ZIP como artefato de referência.
+Em 2026-10-25, o repositório público [HGBits/npass-store](https://github.com/HGBits/npass-store) foi consultado diretamente. O README atual identifica a versão **2.8**, e o código-fonte `lib/15-ls.bash`, o dispatcher `lib/00-main.bash`, a manpage e `tests/ls.bats` confirmam que o comando atual é `npass ls --flat ID [DIR]`. O comando `tree` foi explicitamente descontinuado e retorna erro com uma mensagem que aponta para `ls`.
+
+**Contrato adotado pela TUI para a CLI atual (npass-store 2.8):** `npass ls --flat ID [DIR]`. A tabela da versão 2.5 abaixo foi corrigida para deixar claro que seu contrato de listagem não corresponde ao atual. Se a TUI precisar suportar 2.5, isso deverá ser uma compatibilidade explícita, validada por versão ou por detecção segura, não uma troca cega de `ls` por `tree`.
+
+O ZIP original continha 91 entradas, incluindo README, `lib/`, `extensions/`, `tests/`, documentação de manpages e o helper Rust de passkeys. O executável `bin/npass` é gerado por `build.sh`; não é fonte primária e não veio no ZIP como artefato de referência.
 
 Escopo desta fase: mapear os contratos públicos relevantes para a TUI, registrar as operações disponíveis, identificar comportamentos perigosos e estabelecer a ordem segura de implementação. Nenhuma operação de cofre real foi executada.
 
@@ -29,7 +33,7 @@ Escopo desta fase: mapear os contratos públicos relevantes para a TUI, registra
 | `lib/12-diceware.bash` | Diceware e frases memoráveis |
 | `lib/13-backup.bash` | Anexos cifrados de senhas de recuperação |
 | `lib/14-entry.bash` | Parser e serializador único do formato md1 |
-| `lib/15-tree.bash` | Árvore de caminhos e saída plana para máquinas |
+| `lib/15-tree.bash` (snapshot npass 2.5) | Árvore de caminhos e saída plana para máquinas; no npass-store 2.8, o módulo correspondente é `lib/15-ls.bash` |
 | `lib/16-view.bash` | Comando público `show`, renderização Markdown e links de navegação |
 | `lib/17-open.bash` | Abertura de links `npass://` com confirmação |
 | `lib/18-help.bash` | Ajuda por categoria e seção |
@@ -44,9 +48,10 @@ Regra arquitetural importante: a TUI deve chamar a CLI pública e não depender 
 |---|---|---|
 | Listar identidades | `npass identities` ou `npass ids` | A saída é texto de apresentação, com nome e contagem de arquivos blob. Não tratá-la como formato estruturado estável nem presumir que a contagem seja só logins: anexos também são blobs. |
 | Criar identidade | `npass init [--sign[=KEYID]] ID RECIPIENT...` | Administração separada da navegação normal; requer destinatários GPG. |
-| Listar caminhos | `npass tree --flat ID [DIR]` | **Interface de máquina documentada:** um caminho lógico por linha, sem decoração. Preferir essa forma para alimentar a lista. |
-| Árvore humana | `npass tree ID [DIR]` | Inclui pastas inferidas, marcadores `[backup]` e desenho dependente de locale/TTY; não fazer parsing dessa apresentação se `--flat` atende. |
-| Comando antigo de listagem | `ls`/`list` | Explicitamente recusado: a mensagem orienta para `tree`. Não usar `npass ls`. |
+| Listar caminhos no snapshot 2.5 | `npass tree --flat ID [DIR]` | Contrato observado no ZIP da versão 2.5; **não é o contrato da CLI atual**. |
+| Listar caminhos na CLI atual 2.8 | `npass ls --flat ID [DIR]` | **Interface de máquina atual confirmada no código-fonte:** um caminho lógico por linha, sem decoração. É o comando usado pela TUI. |
+| Árvore humana na CLI atual 2.8 | `npass ls ID [DIR]` | Árvore de caminhos, com pastas inferidas e marcadores `[backup]`; desenho depende de locale/TTY. |
+| Comando legado na CLI atual 2.8 | `npass tree [--flat] ID [DIR]` | Explicitamente recusado pelo dispatcher; a mensagem direciona para `npass ls`. Não usar `tree` na versão atual. |
 | Procurar caminhos | `npass find ID PADRÃO` | Busca textual nos caminhos lógicos; não confundir com pesquisa de conteúdo. |
 | Procurar conteúdo | `npass grep ID [OPÇÕES-GREP] PADRÃO` | Decifra entradas e pode imprimir segredos. Não executar implicitamente nem despejar resultados na tela da TUI. |
 
