@@ -35,7 +35,7 @@ Use mocks/fixtures isolados, nunca o cofre pessoal. Inclua os testes novos no CI
 
 ### P0 — Segurança e confiabilidade
 
-- [ ] **Completar a cobertura com mock da CLI e pseudo-terminal (PTY).** O driver determinístico já cobre criação/edição/exclusão, cancelamento e retorno não zero. Ainda faltam caracteres de controle, restauração do terminal após falha/sinal e verificação de que nenhum segredo vai para argv/log/status.
+- [ ] **Completar a cobertura com mock da CLI e pseudo-terminal (PTY).** O driver determinístico cobre criação/edição/exclusão, cancelamento, retorno não zero, saída maliciosa com sequências OSC/CSI e restauração dos atributos do terminal após `SIGTERM`. Ainda faltam restauração do terminal após falha de comandos interativos e verificação de que nenhum segredo vai para argv/log/status.
 - [ ] **Validar a integração real com terminal e cofre de teste.** Testar manualmente `insert`, `edit`, preview, clipboard e OTP em pelo menos um terminal compatível; não usar o cofre pessoal como fixture.
 - [ ] **Revisar limpeza visual de segredos.** Ao sair do preview ou após exibir OTP, limpar/redesenhar a tela quando apropriado e evitar manter conteúdo secreto em status ou mensagens duradouras.
 - [ ] **Tratar nomes/caminhos e saída inesperada da CLI de forma robusta.** Não depender de parsing frágil da saída humana; validar nomes e falhas sem esconder erros de descriptografia.
