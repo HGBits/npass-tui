@@ -9,6 +9,7 @@ import fcntl
 import os
 import pty
 import select
+import signal
 import struct
 import subprocess
 import sys
@@ -24,6 +25,7 @@ def main():
     scenario, tui_path = sys.argv[1:]
     master, slave = pty.openpty()
     fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 24, 100, 0, 0))
+    original_tty = termios.tcgetattr(slave)
     env = os.environ.copy()
     env["TERM"] = "xterm"
     proc = subprocess.Popen(
@@ -66,6 +68,22 @@ def main():
 
     try:
         read_until("personal")
+
+        if scenario == "signal-term":
+            os.kill(proc.pid, signal.SIGTERM)
+            return_code = proc.wait(timeout=max(0.1, deadline - time.monotonic()))
+            restored_tty = termios.tcgetattr(master)
+            if return_code != 143:
+                print("expected exit status 143 after SIGTERM, got", return_code, file=sys.stderr)
+                return 1
+            if restored_tty != original_tty:
+                print("terminal attributes were not restored after SIGTERM", file=sys.stderr)
+                return 1
+            if b"\x1b[?25h" not in output:
+                print("cursor-show sequence missing during cleanup", file=sys.stderr)
+                return 1
+            return 0
+
         send("\r")
         read_until("example/login")
 
@@ -95,6 +113,17 @@ def main():
             read_until('Digite exatamente "sim"')
             send("nao\n")
             read_until("Exclusão cancelada.")
+        elif scenario == "control-output":
+            send("\r")
+            read_until("Conteúdo da entrada")
+            read_until("safe-line")
+            if b"PWNED-TITLE" in output or b"\x1b[?9999h" in output:
+                print("untrusted CLI control sequence reached the terminal", file=sys.stderr)
+                return 1
+            send("q")
+            before_entries = len(output)
+            entries_end = read_until("Entradas", after=before_entries)
+            read_until("Esc voltar", after=entries_end)
         else:
             raise ValueError("unknown scenario: " + scenario)
 
@@ -107,6 +136,7 @@ def main():
             "edit-fail": "npass edit falhou (código 17)",
             "delete": "Comando npass rm concluído",
             "delete-cancel": "Exclusão cancelada.",
+            "control-output": "Entradas",
         }[scenario]
         status_end = output.find(status_marker.encode("utf-8"))
         read_until("Esc voltar", after=status_end + len(status_marker.encode("utf-8")))
