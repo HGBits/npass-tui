@@ -2,7 +2,7 @@
 load test_helper
 
 @test "exclusão exige confirmação explícita e não usa force" {
-  run run_tui delete
+  run_tui_case delete
   [ "$status" -eq 0 ]
   assert_log_has 'rm personal example/login'
   run grep -Eq '^rm .* (-f|--force)( |$)' "$LOG"
@@ -10,7 +10,7 @@ load test_helper
 }
 
 @test "cancelar exclusão não chama npass rm" {
-  run run_tui delete-cancel
+  run_tui_case delete-cancel
   [ "$status" -eq 0 ]
   run grep -Eq '^rm ' "$LOG"
   [ "$status" -ne 0 ]
