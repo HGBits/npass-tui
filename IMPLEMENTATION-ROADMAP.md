@@ -28,7 +28,7 @@ A TUI já oferece:
 
 ### P1 — Operações essenciais de gerenciamento
 
-- [ ] **Excluir entrada (`npass rm`).** Confirmação clara com identidade e caminho completos; informar que anexos de backup reconhecidos também podem ser removidos. Não usar `-f` automaticamente.
+- [x] **Excluir entrada (`npass rm`).** A ação `d` exibe identidade/caminho, alerta sobre anexos de backup e exige digitar `sim`; chama `npass rm` sem `-f`. Testes PTY cobrem confirmação e cancelamento.
 - [ ] **Gerar senha (`npass generate`).** Oferecer escolha explícita entre criar/substituir entrada e atualizar só a senha preservando campos, OTP e notas (`--in-place`, quando suportado). Exibir claramente o destino e respeitar a confirmação da CLI.
 - [ ] **Renomear/mover entrada (`npass mv`).** Fluxo dedicado para caminho de origem e destino, validação de destino e confirmação. Distinguir movimento dentro da mesma identidade de movimento entre identidades, que recifra para os destinatários de destino.
 - [ ] **Criar identidade (`npass init`).** Formulário para ID e destinatários GPG, com validação e confirmação; não misturar administração de identidades com navegação cotidiana.
