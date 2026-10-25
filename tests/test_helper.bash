@@ -23,7 +23,7 @@ case "$1" in
     ;;
   insert|edit|rm) stty -g >>"$NPASS_TTY_LOG"; exit "${MOCK_ACTION_EXIT:-0}" ;;
   show)
-    if [[ ${MOCK_SHOW_FAIL:-0} == 1 ]]; then printf 'FAIL-SECRET-SENTINEL\\n'; exit 17; fi
+    if [[ ${MOCK_SHOW_FAIL:-0} == 1 ]]; then printf 'FAIL-SECRET-SENTINEL\n'; exit 17; fi
     if [[ ${MOCK_SHOW_CONTROL:-0} == 1 ]]; then
       printf 'safe-line\033]0;PWNED-TITLE\007\033[?9999hstill-safe\n'
     else
@@ -31,12 +31,12 @@ case "$1" in
     fi
     ;;
   clip)
-    if [[ ${MOCK_CLIP_FAIL:-0} == 1 ]]; then printf 'FAIL-SECRET-SENTINEL\\n'; exit 17; fi
+    if [[ ${MOCK_CLIP_FAIL:-0} == 1 ]]; then printf 'FAIL-SECRET-SENTINEL\n'; exit 17; fi
     exit 0
     ;;
   otp)
-    printf 'OTP-SENTINEL-123456\\n'
-    if [[ ${MOCK_OTP_FAIL:-0} == 1 ]]; then printf 'FAIL-SECRET-SENTINEL\\n'; exit 17; fi
+    printf 'OTP-SENTINEL-123456\n'
+    if [[ ${MOCK_OTP_FAIL:-0} == 1 ]]; then printf 'FAIL-SECRET-SENTINEL\n'; exit 17; fi
     ;;
   *) printf 'unexpected command: %s\n' "$1" >&2; exit 90 ;;
 esac
