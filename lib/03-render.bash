@@ -31,6 +31,7 @@ footer() {
 render_list() {
     local title=$1
     local -n items=$2
+    local empty_msg=${3:-}
     local i row available start
     header
     put 2 1 "$title" "$((COLS - 2))"
@@ -52,6 +53,9 @@ render_list() {
             fi
         fi
     done
+    if (( ${#items[@]} == 0 )) && [[ -n $empty_msg ]]; then
+        put 4 2 "$empty_msg" "$((COLS - 3))"
+    fi
     footer
 }
 
@@ -71,10 +75,16 @@ render_preview() {
 }
 
 render_current() {
+    local empty
     if [[ $SCREEN == identities ]]; then
-        render_list 'Escolha uma identidade' IDENTITIES
+        render_list 'Escolha uma identidade' IDENTITIES 'Nenhuma identidade. Crie uma com: npass init'
     elif [[ $SCREEN == entries ]]; then
-        render_list "Entradas  |  filtro: ${QUERY:-nenhum}" VISIBLE
+        if [[ -n $QUERY ]]; then
+            empty='Nenhuma entrada corresponde ao filtro. Use / com valor vazio para remover.'
+        else
+            empty='Identidade sem entradas. Pressione a para criar a primeira.'
+        fi
+        render_list "Entradas  |  filtro: ${QUERY:-nenhum}" VISIBLE "$empty"
     else
         render_preview
     fi
