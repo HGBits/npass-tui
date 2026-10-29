@@ -109,3 +109,9 @@ Marque `[x]` somente quando:
 5. riscos de terminal e exposição de segredos tiverem sido revisados.
 
 A lista é um plano de trabalho, não uma afirmação de que todos os comandos do npass devam obrigatoriamente virar telas da TUI. Priorize fluxos frequentes e seguros; transformar cada comando em um menu só produz uma CLI com decoração.
+
+## Atualização 2026-10-29
+
+- Código dividido em `lib/` (ver README); suíte atual: 5 arquivos Bats, 26 testes + `tests/pty_driver.py`.
+- Concluído: sanitização na confirmação de exclusão, filtro de identidades, estabilização de `edit-fail`, estado vazio de entradas/identidades, checagem de versão do `npass` (2.x ≥ 2.8), CI em `main` e `master`.
+- Próximo: `npass generate`, depois `npass mv`.

@@ -6,10 +6,23 @@ Interface de terminal em **Bash** para o [`npass`](https://github.com/HGBits/npa
 
 - Bash 4.3+
 - `tput` e `stty` (normalmente fornecidos por ncurses/coreutils/util-linux, conforme a distribuição)
-- `npass-store` **2.8** instalado e configurado conforme a documentação do projeto (versão-alvo de compatibilidade da TUI)
+- `npass-store` **2.8** instalado e configurado conforme a documentação do projeto (versão-alvo; a TUI aborta se a versão for incompatível — `NPASS_TUI_SKIP_VERSION_CHECK=1` ignora a checagem)
 - Terminal interativo com suporte a terminfo
 
 Não depende de Python, `dialog`, `fzf` ou `gum`.
+
+## Estrutura
+
+```
+npass-tui          # ponto de entrada: checagens, carga das libs, loop principal
+lib/00-core.bash   # estado, traps, modo do terminal, sanitização
+lib/01-input.bash  # teclado → tokens lógicos
+lib/02-backend.bash# contrato com a CLI npass (versão, identidades, caminhos)
+lib/03-render.bash # telas e renderização
+lib/04-actions.bash# ações do usuário (clip, otp, insert, edit, rm, filtro)
+```
+
+As libs são localizadas ao lado do script (symlinks resolvidos), em `/usr/share/npass-tui/lib` ou em `NPASS_TUI_LIB`.
 
 ## Executar
 

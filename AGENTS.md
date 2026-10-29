@@ -61,3 +61,7 @@ Este repositório contém uma interface de terminal (TUI) em Bash para o `npass`
 - Não despeje resultados de busca de conteúdo ou documentos secretos em mensagens de status.
 - Mantenha navegação por setas e atalhos documentados consistentes; atalhos desconhecidos não devem disparar ações.
 - Prefira alterações pequenas, testáveis e reversíveis. Não replique na TUI regras de negócio que já pertencem ao `npass`.
+
+## Estrutura de código
+
+Lógica em `lib/NN-nome.bash` (carregadas em ordem); `npass-tui` só faz checagens, carrega libs e roda `main_loop`. Todo texto vindo da CLI deve passar por `sanitize_text`/`put`. Terminal cooked para filhos interativos: `cooked_mode`; de volta: `raw_mode`.
