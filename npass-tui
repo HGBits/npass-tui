@@ -121,7 +121,7 @@ load_identities() {
         # npass identities emits summaries as "NAME - N passwords". Ignore
         # other successful output (for example, its localized empty-store
         # message) instead of treating it as an identity name.
-        if [[ $line =~ ^(.*)[[:space:]]-[[:space:]]+[0-9]+[[:space:]].*$ ]]; then
+        if [[ $line =~ ^(.*)[[:space:]]-[[:space:]]+[0-9]+[[:space:]]+(senha|senhas|password|passwords)$ ]]; then
             ident=${BASH_REMATCH[1]}
         else
             continue
