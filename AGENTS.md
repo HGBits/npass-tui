@@ -66,3 +66,18 @@ Este repositório contém uma interface de terminal (TUI) em Bash para o `npass`
 ## Estrutura de código
 
 Lógica em `lib/NN-nome.bash`, concatenada em ordem por `build.sh` no arquivo único `bin/npass-tui` (gerado, no `.gitignore`; **nunca edite `bin/`**). `lib/99-main.bash` (sempre o último) faz as checagens de ambiente e roda `main_loop`. Libs não podem ter efeitos colaterais ao serem carregadas além de definir funções e variáveis, porque os testes as carregam isoladamente com `source`. Todo texto vindo da CLI deve passar por `sanitize_text`/`put`. Terminal cooked para filhos interativos: `cooked_mode`; de volta: `raw_mode`.
+
+
+## Objetivo futuro: distribuir um binário pronto para o npass-store
+
+O objetivo futuro é ajustar o build e a distribuição do `npass-tui` para publicar um binário pré-compilado em um local estável, que possa ser consumido diretamente pelo instalador de `npass-store`.
+
+Diretrizes para trabalhos futuros:
+
+- Permitir que o instalador de `npass-store` baixe e instale o artefato publicado sem clonar o repositório `npass-tui` nem executar o build durante a instalação.
+- Definir um processo de publicação e versionamento confiável, por exemplo, usando releases do GitHub.
+- Atualizar o instalador do `npass-store` para baixar o artefato e verificar sua integridade antes de instalá-lo.
+- Definir claramente as plataformas e arquiteturas suportadas e tratar falhas de download ou validação com mensagens úteis.
+- Manter o fluxo atual funcionando até que a nova distribuição esteja implementada e testada.
+
+**Importante:** esta é uma meta futura, não uma capacidade já implementada. Não presuma que o binário publicado já existe nem faça o instalador depender dele antes de definir e validar o processo de release.
