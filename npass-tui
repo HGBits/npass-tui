@@ -5,6 +5,17 @@ set -uo pipefail
 APP_NAME=${APP_NAME:-npass-tui}
 NPASS_BIN=${NPASS_BIN:-npass}
 
+# Locate lib/: explicit override, next to the script (symlinks resolved), or system path.
+SELF=$(readlink -f -- "${BASH_SOURCE[0]}")
+for NPASS_TUI_LIB in "${NPASS_TUI_LIB:-}" "${SELF%/*}/lib" /usr/share/npass-tui/lib; do
+    [[ -n $NPASS_TUI_LIB && -r $NPASS_TUI_LIB/00-core.bash ]] && break
+    NPASS_TUI_LIB=''
+done
+if [[ -z $NPASS_TUI_LIB ]]; then
+    printf '%s: diretório lib/ não encontrado; defina NPASS_TUI_LIB.\n' "$APP_NAME" >&2
+    exit 1
+fi
+
 if ! command -v tput >/dev/null 2>&1; then
     printf '%s: dependência ausente: tput (ncurses/terminfo).\n' "$APP_NAME" >&2
     exit 1
@@ -18,374 +29,13 @@ if [[ ! -t 0 || ! -t 1 ]]; then
     exit 1
 fi
 
-ESC=$'\033'
-RESET=$(tput sgr0 2>/dev/null || printf '')
-BOLD=$(tput bold 2>/dev/null || printf '')
-REV=$(tput rev 2>/dev/null || printf '')
-DIM=$(tput dim 2>/dev/null || printf '')
-CYAN=$(tput setaf 6 2>/dev/null || printf '')
+for lib in "$NPASS_TUI_LIB"/*.bash; do
+    # shellcheck source=/dev/null
+    source "$lib"
+done
+
 TTY_STATE=$(stty -g)
-SCREEN=identities
-CURRENT_ID=''
-QUERY=''
-STATUS='↑/↓ navegar  Enter abrir  a nova entrada  e editar  d excluir  c copiar  o OTP  q sair'
-CURSOR=0
-OFFSET=0
-IDENTITIES=()
-PATHS=()
-VISIBLE=()
-PREVIEW_LINES=()
-PREVIEW_OFFSET=0
-
-cleanup() {
-    stty "$TTY_STATE" 2>/dev/null || true
-    tput cnorm 2>/dev/null || true
-    tput sgr0 2>/dev/null || true
-    tput clear 2>/dev/null || true
-}
-trap cleanup EXIT
-trap 'exit 130' INT
-trap 'exit 143' TERM
-trap 'exit 129' HUP
-
-raw_mode() {
-    stty -echo -icanon min 1 time 0
-    tput civis 2>/dev/null || true
-}
-
-read_key() {
-    local key seq rc
-    # Poll with a timeout so pending signal traps run even while the user is idle.
-    while :; do
-        if IFS= read -r -s -n 1 -t 0.2 key; then
-            break
-        else
-            rc=$?
-        fi
-        # Bash read returns >128 on timeout; EOF or a closed terminal means quit.
-        if (( rc > 128 )); then
-            continue
-        fi
-        REPLY=quit
-        return
-    done
-    if [[ $key == "$ESC" ]]; then
-        IFS= read -r -s -n 1 -t 0.03 seq || seq=''
-        if [[ $seq == '[' ]]; then
-            IFS= read -r -s -n 1 -t 0.03 key || key=''
-            case $key in A) REPLY=up ;; B) REPLY=down ;; C) REPLY=right ;; D) REPLY=left ;; *) REPLY=unknown ;; esac
-        else
-            REPLY=back
-        fi
-        return
-    fi
-    case $key in
-        $'\n'|$'\r'|'') REPLY=enter ;;
-        q|Q) REPLY=quit ;;
-        j) REPLY=down ;;
-        k) REPLY=up ;;
-        a|A) REPLY=add ;;
-        e|E) REPLY=edit ;;
-        d|D) REPLY=delete ;;
-        c|C) REPLY=clip ;;
-        o|O) REPLY=otp ;;
-        /) REPLY=search ;;
-        *) REPLY=unknown ;;
-    esac
-}
-
-sanitize_text() {
-    # Strip terminal escape sequences and control characters from untrusted text.
-    printf '%s' "$1" | LC_ALL=C sed -E \
-        's#\x1B\][^\x07]*(\x07|\x1B\\)##g; s#\x1B\[[0-?]*[ -/]*[@-~]##g; s#\x1B[@-_]##g; s#[[:cntrl:]]##g'
-}
-
-set_status() {
-    local clean
-    clean=$(sanitize_text "$1")
-    STATUS=$clean
-}
-
-load_identities() {
-    local output line ident rc
-    if output=$("$NPASS_BIN" identities 2>&1); then
-        :
-    else
-        rc=$?
-        set_status "Erro ao listar identidades (código $rc)."
-        return 1
-    fi
-    IDENTITIES=()
-    while IFS= read -r line; do
-        [[ -z ${line//[[:space:]]/} ]] && continue
-        # npass identities emits summaries as "NAME - N passwords". Ignore
-        # other successful output (for example, its localized empty-store
-        # message) instead of treating it as an identity name.
-        if [[ $line =~ ^(.*)[[:space:]]-[[:space:]]+[0-9]+[[:space:]]+(senha|senhas|password|passwords)$ ]]; then
-            ident=${BASH_REMATCH[1]}
-        else
-            continue
-        fi
-        ident=${ident#"${ident%%[![:space:]]*}"}
-        ident=${ident%"${ident##*[![:space:]]}"}
-        [[ -n $ident ]] && IDENTITIES+=("$ident")
-    done <<< "$output"
-    if (("${#IDENTITIES[@]}" == 0)); then
-        set_status 'Nenhuma identidade encontrada.'
-        return 1
-    fi
-}
-
-load_paths() {
-    local output line rc
-    # Never leave paths from the previous identity selectable after an error.
-    PATHS=()
-    VISIBLE=()
-    CURSOR=0
-    OFFSET=0
-    if output=$("$NPASS_BIN" ls --flat "$CURRENT_ID" 2>&1); then
-        :
-    else
-        rc=$?
-        set_status "Erro ao listar entradas (código $rc)."
-        return 1
-    fi
-    PATHS=()
-    while IFS= read -r line; do [[ -n $line ]] && PATHS+=("$line"); done <<< "$output"
-    rebuild_visible
-}
-
-rebuild_visible() {
-    local path
-    VISIBLE=()
-    for path in "${PATHS[@]}"; do
-        [[ -z $QUERY || ${path,,} == *"${QUERY,,}"* ]] && VISIBLE+=("$path")
-    done
-    CURSOR=0
-    OFFSET=0
-}
-
-term_size() {
-    ROWS=$(tput lines 2>/dev/null || printf 24)
-    COLS=$(tput cols 2>/dev/null || printf 80)
-    (( ROWS >= 8 )) || ROWS=8
-    (( COLS >= 32 )) || COLS=32
-}
-
-put() {
-    local row=$1 col=$2 text=$3 max=${4:-999}
-    text=$(sanitize_text "$text")
-    tput cup "$row" "$col" 2>/dev/null || true
-    printf '%.*s' "$max" "$text"
-}
-
-clear_line() { put "$1" 0 "$(printf '%*s' "$COLS" '')" "$COLS"; }
-
-header() {
-    term_size
-    tput clear
-    printf '%s%s' "$CYAN" "$BOLD"
-    put 0 0 " npass-tui  /  ${CURRENT_ID:-identidades}" "$COLS"
-    printf '%s' "$RESET"
-    put 1 0 "$(printf '%*s' "$COLS" '' | tr ' ' '-')" "$COLS"
-}
-
-footer() {
-    local row=$((ROWS - 2))
-    clear_line "$row"
-    printf '%s' "$DIM"
-    put "$row" 0 "$STATUS" "$COLS"
-    printf '%s' "$RESET"
-    clear_line $((ROWS - 1))
-    put $((ROWS - 1)) 0 '↑/↓ navegar  Enter abrir  a criar  e editar  d excluir  / filtrar  c copiar  o OTP  Esc voltar  q sair' "$COLS"
-}
-
-render_list() {
-    local title=$1
-    local -n items=$2
-    local i row available start
-    header
-    put 2 1 "$title" "$((COLS - 2))"
-    available=$((ROWS - 5))
-    (( available > 0 )) || available=1
-    if (( CURSOR < OFFSET )); then OFFSET=$CURSOR; fi
-    if (( CURSOR >= OFFSET + available )); then OFFSET=$((CURSOR - available + 1)); fi
-    start=$OFFSET
-    for ((i=0; i<available; i++)); do
-        row=$((3 + i))
-        clear_line "$row"
-        if (( start + i < ${#items[@]} )); then
-            if (( start + i == CURSOR )); then
-                printf '%s' "$REV"
-                put "$row" 0 "> ${items[start+i]}" "$COLS"
-                printf '%s' "$RESET"
-            else
-                put "$row" 0 "  ${items[start+i]}" "$COLS"
-            fi
-        fi
-    done
-    footer
-}
-
-show_message() {
-    local message=$1
-    set_status "$message"
-    render_current
-    IFS= read -r -s -n 1 -t 2 _ || true
-}
-
-run_action() {
-    local action=$1 path=$2 output rc
-    case $action in
-        clip)
-            if output=$("$NPASS_BIN" clip "$CURRENT_ID" "$path" 2>&1); then
-                show_message 'Comando npass clip concluído.'
-            else
-                rc=$?
-                show_message "Falha ao copiar (código $rc)."
-            fi
-            return ;;
-        otp)
-            if output=$("$NPASS_BIN" otp "$CURRENT_ID" "$path" 2>&1); then
-                :
-            else
-                rc=$?
-                show_message "Falha ao obter OTP (código $rc)."
-                return
-            fi
-            PREVIEW_LINES=()
-            while IFS= read -r line; do PREVIEW_LINES+=("$line"); done <<< "$output"
-            SCREEN=preview
-            set_status "OTP de $path (qualquer tecla volta)"
-            render_preview
-            IFS= read -r -s -n 1
-            SCREEN=entries
-            PREVIEW_LINES=()
-            PREVIEW_OFFSET=0 ;;
-    esac
-}
-
-open_preview() {
-    local path=$1 content line rc
-    if content=$("$NPASS_BIN" show --raw "$CURRENT_ID" "$path" 2>&1); then
-        :
-    else
-        rc=$?
-        show_message "Erro ao abrir entrada (código $rc)."
-        return
-    fi
-    PREVIEW_LINES=()
-    while IFS= read -r line; do PREVIEW_LINES+=("$line"); done <<< "$content"
-    SCREEN=preview
-    PREVIEW_OFFSET=0
-    set_status "$path  |  ↑/↓ rolar  c copiar  o OTP  Esc voltar"
-    render_preview
-}
-
-render_preview() {
-    local i row max_lines
-    header
-    put 2 1 'Conteúdo da entrada' "$((COLS - 2))"
-    max_lines=$((ROWS - 5))
-    for ((i=0; i<max_lines; i++)); do
-        row=$((3 + i))
-        clear_line "$row"
-        if (( PREVIEW_OFFSET + i < ${#PREVIEW_LINES[@]} )); then
-            put "$row" 1 "${PREVIEW_LINES[PREVIEW_OFFSET+i]}" "$((COLS - 2))"
-        fi
-    done
-    footer
-}
-
-render_current() {
-    if [[ $SCREEN == identities ]]; then
-        render_list 'Escolha uma identidade' IDENTITIES
-    elif [[ $SCREEN == entries ]]; then
-        render_list "Entradas  |  filtro: ${QUERY:-nenhum}" VISIBLE
-    else
-        render_preview
-    fi
-}
-
-search_prompt() {
-    local input
-    stty "$TTY_STATE"
-    tput cnorm 2>/dev/null || true
-    tput cup $((ROWS - 2)) 0
-    printf '%s' 'Filtro (vazio remove): '
-    IFS= read -r input || input=''
-    raw_mode
-    QUERY=$input
-    rebuild_visible
-    set_status "Filtro aplicado: ${QUERY:-nenhum}"
-}
-
-confirm_delete() {
-    local path=$1 answer safe_identity safe_path
-    stty "$TTY_STATE"
-    tput cnorm 2>/dev/null || true
-    tput sgr0 2>/dev/null || true
-    tput clear 2>/dev/null || true
-    # Identity and path originate outside the TUI; never print them raw to the terminal.
-    safe_identity=$(sanitize_text "$CURRENT_ID")
-    safe_path=$(sanitize_text "$path")
-    printf 'EXCLUIR ENTRADA\n\nIdentidade: %s\nCaminho:    %s\n\n' "$safe_identity" "$safe_path"
-    printf 'A CLI também pode remover anexos de backup desta entrada.\n'
-    printf 'Digite exatamente "sim" para continuar (qualquer outra resposta cancela): '
-    IFS= read -r answer || answer=''
-    raw_mode
-    if [[ $answer == sim ]]; then
-        REPLY=$path
-        return 0
-    fi
-    set_status 'Exclusão cancelada.'
-    return 1
-}
-
-prompt_path() {
-    local input
-    stty "$TTY_STATE"
-    tput cnorm 2>/dev/null || true
-    tput sgr0 2>/dev/null || true
-    tput cup $((ROWS - 2)) 0
-    clear_line $((ROWS - 2))
-    printf '%s' 'Caminho da nova entrada (vazio cancela): '
-    IFS= read -r input || input=''
-    raw_mode
-    if [[ -z $input ]]; then
-        set_status 'Criação cancelada.'
-        return 1
-    fi
-    REPLY=$input
-}
-
-run_interactive_npass() {
-    local action=$1 path=$2 rc
-    # npass insert prompts for the secret twice; npass edit launches $EDITOR.
-    # Both need the user's normal terminal settings and the real terminal streams.
-    stty "$TTY_STATE"
-    tput cnorm 2>/dev/null || true
-    tput sgr0 2>/dev/null || true
-    case $action in
-        insert) "$NPASS_BIN" insert "$CURRENT_ID" "$path"; rc=$? ;;
-        edit)   "$NPASS_BIN" edit "$CURRENT_ID" "$path"; rc=$? ;;
-        rm)     "$NPASS_BIN" rm "$CURRENT_ID" "$path"; rc=$? ;;
-        *)      rc=2 ;;
-    esac
-    raw_mode
-    if (( rc == 0 )); then
-        if [[ $action == insert ]]; then
-            set_status "Entrada enviada ao npass: $path"
-        elif [[ $action == edit ]]; then
-            set_status "Edição concluída: $path"
-        else
-            set_status "Comando npass rm concluído: $path"
-        fi
-    else
-        set_status "npass $action falhou (código $rc): $path"
-    fi
-    load_paths || true
-}
+install_traps
 
 main_loop() {
     load_identities || true
@@ -398,7 +48,7 @@ main_loop() {
             identities:up) (( CURSOR > 0 )) && ((CURSOR--)) ;;
             identities:down) (( CURSOR + 1 < ${#IDENTITIES[@]} )) && ((CURSOR++)) ;;
             identities:enter)
-                if (("${#IDENTITIES[@]}" > 0)); then
+                if (( ${#IDENTITIES[@]} > 0 )); then
                     CURRENT_ID=${IDENTITIES[CURSOR]}
                     SCREEN=entries; QUERY=''
                     if load_paths; then
@@ -417,9 +67,9 @@ main_loop() {
                 if (( ${#VISIBLE[@]} > 0 )) && confirm_delete "${VISIBLE[CURSOR]}"; then
                     run_interactive_npass rm "$REPLY"
                 fi ;;
-            entries:enter) if (("${#VISIBLE[@]}" > 0)); then open_preview "${VISIBLE[CURSOR]}"; fi ;;
-            entries:clip) if (("${#VISIBLE[@]}" > 0)); then run_action clip "${VISIBLE[CURSOR]}"; fi ;;
-            entries:otp) if (("${#VISIBLE[@]}" > 0)); then run_action otp "${VISIBLE[CURSOR]}"; fi ;;
+            entries:enter) if (( ${#VISIBLE[@]} > 0 )); then open_preview "${VISIBLE[CURSOR]}"; fi ;;
+            entries:clip) if (( ${#VISIBLE[@]} > 0 )); then run_action clip "${VISIBLE[CURSOR]}"; fi ;;
+            entries:otp) if (( ${#VISIBLE[@]} > 0 )); then run_action otp "${VISIBLE[CURSOR]}"; fi ;;
             preview:quit|preview:back)
                 SCREEN=entries
                 PREVIEW_LINES=()
