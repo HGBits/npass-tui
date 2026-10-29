@@ -17,9 +17,9 @@ case "$1" in
     if [[ ${MOCK_IDENTITIES_FAIL:-0} == 1 ]]; then printf 'FAIL-SECRET-SENTINEL\n'; exit 17; fi
     if [[ ${MOCK_IDENTITIES_EMPTY:-0} == 1 ]]; then printf 'Nenhuma identidade em /tmp/npass-test-store.\n'; exit 0; fi
     if [[ ${MOCK_IDENTITY_CONTROL:-0} == 1 ]]; then
-      printf 'personal\033]0;PWNED-IDENTITY\007 - 2 entries\n'
+      printf 'personal\033]0;PWNED-IDENTITY\007 - 2 senhas\n'
     else
-      printf 'personal - 2 entries\n'
+      printf 'personal - 2 senhas\n'
     fi
     ;;
   ls)
