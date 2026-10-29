@@ -118,9 +118,13 @@ load_identities() {
     IDENTITIES=()
     while IFS= read -r line; do
         [[ -z ${line//[[:space:]]/} ]] && continue
-        ident=$line
+        # npass identities emits summaries as "NAME - N passwords". Ignore
+        # other successful output (for example, its localized empty-store
+        # message) instead of treating it as an identity name.
         if [[ $line =~ ^(.*)[[:space:]]-[[:space:]]+[0-9]+[[:space:]].*$ ]]; then
             ident=${BASH_REMATCH[1]}
+        else
+            continue
         fi
         ident=${ident#"${ident%%[![:space:]]*}"}
         ident=${ident%"${ident##*[![:space:]]}"}
