@@ -2,7 +2,7 @@ name: Shell checks
 
 on:
   push:
-    branches: [main]
+    branches: [main, master]
   pull_request:
 
 jobs:
