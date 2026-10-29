@@ -5,14 +5,12 @@
 # Uso:
 #   sudo ./install.sh                      instala em /usr/bin/npass-tui
 #   ./install.sh --prefix=$HOME/.local     instala só para você
-#   ./install.sh --bindir=/caminho/bin     escolhe o diretório do binário
 #   ./install.sh --uninstall               remove o binário instalado
-# Variáveis: PREFIX (padrão /usr), BINDIR, DESTDIR (empacotamento).
+# Variáveis: PREFIX (padrão /usr), DESTDIR (empacotamento).
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
 
 : "${PREFIX:=/usr}"
-: "${BINDIR:=}"
 : "${DESTDIR:=}"
 uninstall=0
 
@@ -20,7 +18,6 @@ for arg in "$@"; do
 	case "$arg" in
 	--uninstall) uninstall=1 ;;
 	--prefix=*) PREFIX="${arg#--prefix=}" ;;
-	--bindir=*) BINDIR="${arg#--bindir=}" ;;
 	-h | --help)
 		awk 'NR>1 && /^#/ {sub(/^# ?/, ""); print; next} NR>1 {exit}' "$0"
 		exit 0
@@ -32,7 +29,7 @@ for arg in "$@"; do
 	esac
 done
 
-bindir="$DESTDIR${BINDIR:-$PREFIX/bin}"
+bindir="$DESTDIR$PREFIX/bin"
 target="$bindir/npass-tui"
 
 if [[ $uninstall -eq 1 ]]; then
