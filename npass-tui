@@ -34,6 +34,8 @@ for lib in "$NPASS_TUI_LIB"/*.bash; do
     source "$lib"
 done
 
+check_npass_version || exit 1
+
 TTY_STATE=$(stty -g)
 install_traps
 

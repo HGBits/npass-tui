@@ -13,6 +13,9 @@ setup() {
 set -eu
 printf '%s\n' "$*" >>"$NPASS_LOG"
 case "$1" in
+  help)
+    printf 'npass %s - mock\n' "${MOCK_VERSION:-2.8}"
+    ;;
   identities)
     if [[ ${MOCK_IDENTITIES_FAIL:-0} == 1 ]]; then printf 'FAIL-SECRET-SENTINEL\n'; exit 17; fi
     if [[ ${MOCK_IDENTITIES_EMPTY:-0} == 1 ]]; then printf 'Nenhuma identidade em /tmp/npass-test-store.\n'; exit 0; fi
@@ -80,6 +83,7 @@ run_tui() {
     MOCK_CLIP_FAIL="${MOCK_CLIP_FAIL:-0}" \
     MOCK_OTP_FAIL="${MOCK_OTP_FAIL:-0}" \
     MOCK_ACTION_EXIT="${MOCK_ACTION_EXIT:-0}" \
+    MOCK_VERSION="${MOCK_VERSION:-2.8}" \
     python3 "$ROOT/tests/pty_driver.py" "$scenario" "$ROOT/npass-tui" \
     >"$PTY_OUT" 2>&1; then
     cat "$PTY_OUT" >&2

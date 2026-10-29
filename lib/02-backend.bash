@@ -1,5 +1,30 @@
 # Backend contract: everything that parses npass CLI output lives here.
 
+# Minimum supported npass-store: MAJOR.MINOR. Same major required.
+NPASS_MIN_MAJOR=2
+NPASS_MIN_MINOR=8
+
+# `npass help` prints "npass X.Y - ..." on its first line.
+check_npass_version() {
+    local first ver major minor
+    [[ ${NPASS_TUI_SKIP_VERSION_CHECK:-0} == 1 ]] && return 0
+    first=$("$NPASS_BIN" help 2>/dev/null | head -n 1)
+    if [[ $first =~ ^npass[[:space:]]+([0-9]+)\.([0-9]+) ]]; then
+        major=${BASH_REMATCH[1]}
+        minor=${BASH_REMATCH[2]}
+    else
+        printf '%s: não foi possível determinar a versão do npass (esperado %d.%d+).\n' \
+            "$APP_NAME" "$NPASS_MIN_MAJOR" "$NPASS_MIN_MINOR" >&2
+        printf '%s: defina NPASS_TUI_SKIP_VERSION_CHECK=1 para ignorar.\n' "$APP_NAME" >&2
+        return 1
+    fi
+    if (( major != NPASS_MIN_MAJOR || minor < NPASS_MIN_MINOR )); then
+        printf '%s: npass %s.%s incompatível; requer %d.%d+ (mesma major).\n' \
+            "$APP_NAME" "$major" "$minor" "$NPASS_MIN_MAJOR" "$NPASS_MIN_MINOR" >&2
+        return 1
+    fi
+}
+
 load_identities() {
     local output line ident rc
     if output=$("$NPASS_BIN" identities 2>&1); then
