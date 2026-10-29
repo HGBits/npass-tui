@@ -69,6 +69,22 @@ def main():
         os.write(master, data.encode("utf-8"))
 
     try:
+        if scenario == "identities-empty":
+            identity_title_end = read_until("Escolha uma identidade")
+            read_until("Esc voltar", after=identity_title_end)
+            if b"Nenhuma identidade encontrada." not in output:
+                print("empty identity list status message missing", file=sys.stderr)
+                return 1
+            if b"Nenhuma identidade em /tmp/npass-test-store." in output:
+                print("CLI empty-store message was rendered as an identity", file=sys.stderr)
+                return 1
+            send("q")
+            return_code = proc.wait(timeout=max(0.1, deadline - time.monotonic()))
+            if return_code != 0 or termios.tcgetattr(master) != original_tty:
+                print("empty identity list did not exit cleanly and restore the terminal", file=sys.stderr)
+                return 1
+            return 0
+
         if scenario == "identities-fail":
             identity_error_end = read_until("Erro ao listar identidades (código 17)")
             read_until("Esc voltar", after=identity_error_end)

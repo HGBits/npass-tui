@@ -25,6 +25,11 @@ load test_helper
   [ "$status" -eq 0 ]
 }
 
+@test "cofre sem identidades não trata a mensagem da CLI como uma identidade" {
+  MOCK_IDENTITIES_EMPTY=1 run_tui_case identities-empty
+  [ "$status" -eq 0 ]
+}
+
 @test "falha ao listar entradas não exibe texto arbitrário da CLI" {
   MOCK_LS_FAIL=1 run_tui_case ls-fail
   [ "$status" -eq 0 ]
