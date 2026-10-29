@@ -317,12 +317,15 @@ search_prompt() {
 }
 
 confirm_delete() {
-    local path=$1 answer
+    local path=$1 answer safe_identity safe_path
     stty "$TTY_STATE"
     tput cnorm 2>/dev/null || true
     tput sgr0 2>/dev/null || true
     tput clear 2>/dev/null || true
-    printf 'EXCLUIR ENTRADA\n\nIdentidade: %s\nCaminho:    %s\n\n' "$CURRENT_ID" "$path"
+    # Identity and path originate outside the TUI; never print them raw to the terminal.
+    safe_identity=$(sanitize_text "$CURRENT_ID")
+    safe_path=$(sanitize_text "$path")
+    printf 'EXCLUIR ENTRADA\n\nIdentidade: %s\nCaminho:    %s\n\n' "$safe_identity" "$safe_path"
     printf 'A CLI também pode remover anexos de backup desta entrada.\n'
     printf 'Digite exatamente "sim" para continuar (qualquer outra resposta cancela): '
     IFS= read -r answer || answer=''
