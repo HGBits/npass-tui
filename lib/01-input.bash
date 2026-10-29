@@ -18,7 +18,7 @@ read_key() {
     done
     if [[ $key == "$ESC" ]]; then
         IFS= read -r -s -n 1 -t 0.03 seq || seq=''
-        if [[ $seq == '[' ]]; then
+        if [[ $seq == '[' || $seq == 'O' ]]; then
             IFS= read -r -s -n 1 -t 0.03 key || key=''
             case $key in A) REPLY=up ;; B) REPLY=down ;; C) REPLY=right ;; D) REPLY=left ;; *) REPLY=unknown ;; esac
         else
