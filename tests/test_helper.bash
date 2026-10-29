@@ -15,7 +15,11 @@ printf '%s\n' "$*" >>"$NPASS_LOG"
 case "$1" in
   identities)
     if [[ ${MOCK_IDENTITIES_FAIL:-0} == 1 ]]; then printf 'FAIL-SECRET-SENTINEL\n'; exit 17; fi
-    printf 'personal - 2 entries\n'
+    if [[ ${MOCK_IDENTITY_CONTROL:-0} == 1 ]]; then
+      printf 'personal\033]0;PWNED-IDENTITY\007 - 2 entries\n'
+    else
+      printf 'personal - 2 entries\n'
+    fi
     ;;
   ls)
     if [[ ${MOCK_LS_FAIL:-0} == 1 ]]; then printf 'FAIL-SECRET-SENTINEL\n'; exit 17; fi
@@ -58,6 +62,7 @@ run_tui() {
     MOCK_SHOW_CONTROL="${MOCK_SHOW_CONTROL:-0}" \
     MOCK_SHOW_FAIL="${MOCK_SHOW_FAIL:-0}" \
     MOCK_IDENTITIES_FAIL="${MOCK_IDENTITIES_FAIL:-0}" \
+    MOCK_IDENTITY_CONTROL="${MOCK_IDENTITY_CONTROL:-0}" \
     MOCK_LS_FAIL="${MOCK_LS_FAIL:-0}" \
     MOCK_PATH_CONTROL="${MOCK_PATH_CONTROL:-0}" \
     MOCK_PATH_SPACES="${MOCK_PATH_SPACES:-0}" \
