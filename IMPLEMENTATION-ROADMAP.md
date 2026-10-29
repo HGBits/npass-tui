@@ -14,7 +14,24 @@ A TUI já oferece:
 - [x] Copiar senha/campo padrão usando `npass clip ID CAMINHO`.
 - [x] Solicitar OTP pela CLI (`npass otp`).
 - [x] Devolver o terminal à CLI para operações interativas e reativar o modo da TUI após o retorno.
-- [x] Testes Bats para criação, edição e exclusão com driver PTY determinístico; CI valida sintaxe Bash/Python e executa os seis cenários.
+- [x] Testes Bats para criação, edição e exclusão com driver PTY determinístico; CI valida sintaxe Bash/Python e executa a suíte comportamental completa (21 testes em 2026-10-29).
+
+## Resultado da última execução de testes
+
+Última execução concluída registrada em 2026-10-29: [GitHub Actions, Shell checks #76](https://github.com/HGBits/npass-tui/actions/runs/40917309834), durante a validação do [PR #10](https://github.com/HGBits/npass-tui/pull/10).
+
+| Verificação | Resultado | Observação |
+|---|---|---|
+| `bash -n npass-tui` | Passou | Sintaxe Bash válida. |
+| `bash -n tests/test_helper.bash` | Passou | Sintaxe dos helpers válida. |
+| `python3 -m py_compile tests/pty_driver.py` | Passou | Driver PTY compila sem erros. |
+| `bats --count tests/*.bats` | Passou | 21 testes descobertos. |
+| `timeout 90s bats tests/*.bats` | **21/21 passaram** | Suíte Bats completa aprovada. |
+| Cenário `edit-fail` | Passou | Verifica o terminal normal entregue à CLI e o retorno ao modo raw da TUI. |
+| Cenário de cofre vazio | Passou | A mensagem da CLI não aparece como identidade selecionável. |
+| Confirmação de exclusão com sequências de controle | Passou | Marcadores OSC não chegam à tela de confirmação. |
+
+Esta tabela registra uma execução concluída e não substitui o resultado do CI para alterações futuras. A validação manual em terminal real e com um cofre de teste continua pendente.
 
 ## Política de implementação e testes
 
