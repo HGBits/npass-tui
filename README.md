@@ -13,28 +13,40 @@ Não depende de Python, `dialog`, `fzf` ou `gum`.
 
 ## Estrutura
 
+O código-fonte fica em `lib/*.bash`. `build.sh` concatena os arquivos, em ordem, no
+executável único `bin/npass-tui` (no `.gitignore`), do mesmo modo que o npass-store gera `bin/npass`.
+O binário gerado não procura `lib/` em tempo de execução: pode ser copiado para qualquer lugar.
+
 ```
-npass-tui          # ponto de entrada: checagens, carga das libs, loop principal
-lib/00-core.bash   # estado, traps, modo do terminal, sanitização
-lib/01-input.bash  # teclado → tokens lógicos
-lib/02-backend.bash# contrato com a CLI npass (versão, identidades, caminhos)
-lib/03-render.bash # telas e renderização
-lib/04-actions.bash# ações do usuário (clip, otp, insert, edit, rm, filtro)
+lib/00-core.bash    # estado, traps, modo do terminal, sanitização
+lib/01-input.bash   # teclado → tokens lógicos
+lib/02-backend.bash # contrato com a CLI npass (versão, identidades, caminhos)
+lib/03-render.bash  # telas e renderização
+lib/04-actions.bash # ações do usuário (clip, otp, insert, edit, rm, filtro)
+lib/99-main.bash    # checagens de ambiente, loop principal e ponto de entrada (sempre por último)
+build.sh            # lib/*.bash -> bin/npass-tui
+install.sh          # reconstrói e instala bin/npass-tui
 ```
 
-As libs são localizadas ao lado do script (symlinks resolvidos), em `/usr/share/npass-tui/lib` ou em `NPASS_TUI_LIB`.
-
-## Executar
+## Instalar
 
 ```sh
-chmod +x npass-tui
-./npass-tui
+sudo ./install.sh                    # /usr/bin/npass-tui
+./install.sh --prefix="$HOME/.local" # só para o seu usuário
+./install.sh --uninstall
+```
+
+## Executar sem instalar
+
+```sh
+./build.sh
+./bin/npass-tui
 ```
 
 Se `npass` não estiver no `PATH`, informe o caminho:
 
 ```sh
-NPASS_BIN="$HOME/.local/bin/npass" ./npass-tui
+NPASS_BIN="$HOME/.local/bin/npass" ./bin/npass-tui
 ```
 
 ## Controles

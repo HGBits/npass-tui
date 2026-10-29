@@ -1,4 +1,4 @@
-# Core: terminal state, sanitization, status line. Sourced by npass-tui.
+# Core: terminal state, sanitization, status line. Part of npass-tui.
 
 ESC=$'\033'
 RESET=$(tput sgr0 2>/dev/null || printf '')

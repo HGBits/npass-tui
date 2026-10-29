@@ -14,9 +14,13 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --yes bats
+      - name: Build bin/npass-tui
+        run: bash build.sh
       - name: Check Bash syntax
         run: |
-          bash -n npass-tui
+          bash -n build.sh
+          bash -n install.sh
+          bash -n bin/npass-tui
           bash -n tests/test_helper.bash
           python3 -m py_compile tests/pty_driver.py
       - name: Validate Bats test files

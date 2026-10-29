@@ -1,43 +1,9 @@
-#!/usr/bin/env bash
-# Minimal Bash TUI. npass remains responsible for all secret operations.
+# Entry point: environment checks, terminal setup and the main loop.
+# Keep this file last (99-): build.sh concatenates lib/*.bash in order.
 set -uo pipefail
 
 APP_NAME=${APP_NAME:-npass-tui}
 NPASS_BIN=${NPASS_BIN:-npass}
-
-# Locate lib/: explicit override, next to the script (symlinks resolved), or system path.
-SELF=$(readlink -f -- "${BASH_SOURCE[0]}")
-for NPASS_TUI_LIB in "${NPASS_TUI_LIB:-}" "${SELF%/*}/lib" /usr/share/npass-tui/lib; do
-    [[ -n $NPASS_TUI_LIB && -r $NPASS_TUI_LIB/00-core.bash ]] && break
-    NPASS_TUI_LIB=''
-done
-if [[ -z $NPASS_TUI_LIB ]]; then
-    printf '%s: diretório lib/ não encontrado; defina NPASS_TUI_LIB.\n' "$APP_NAME" >&2
-    exit 1
-fi
-
-if ! command -v tput >/dev/null 2>&1; then
-    printf '%s: dependência ausente: tput (ncurses/terminfo).\n' "$APP_NAME" >&2
-    exit 1
-fi
-if ! command -v "$NPASS_BIN" >/dev/null 2>&1; then
-    printf '%s: npass não encontrado; defina NPASS_BIN=/caminho/para/npass.\n' "$APP_NAME" >&2
-    exit 1
-fi
-if [[ ! -t 0 || ! -t 1 ]]; then
-    printf '%s: execute em um terminal interativo.\n' "$APP_NAME" >&2
-    exit 1
-fi
-
-for lib in "$NPASS_TUI_LIB"/*.bash; do
-    # shellcheck source=/dev/null
-    source "$lib"
-done
-
-check_npass_version || exit 1
-
-TTY_STATE=$(stty -g)
-install_traps
 
 main_loop() {
     load_identities || true
@@ -84,4 +50,25 @@ main_loop() {
     done
 }
 
-main_loop
+main() {
+    if ! command -v tput >/dev/null 2>&1; then
+        printf '%s: dependência ausente: tput (ncurses/terminfo).\n' "$APP_NAME" >&2
+        exit 1
+    fi
+    if ! command -v "$NPASS_BIN" >/dev/null 2>&1; then
+        printf '%s: npass não encontrado; defina NPASS_BIN=/caminho/para/npass.\n' "$APP_NAME" >&2
+        exit 1
+    fi
+    if [[ ! -t 0 || ! -t 1 ]]; then
+        printf '%s: execute em um terminal interativo.\n' "$APP_NAME" >&2
+        exit 1
+    fi
+
+    check_npass_version || exit 1
+
+    TTY_STATE=$(stty -g)
+    install_traps
+    main_loop
+}
+
+main "$@"

@@ -14,7 +14,7 @@ A TUI já oferece:
 - [x] Copiar senha/campo padrão usando `npass clip ID CAMINHO`.
 - [x] Solicitar OTP pela CLI (`npass otp`).
 - [x] Devolver o terminal à CLI para operações interativas e reativar o modo da TUI após o retorno.
-- [x] Testes Bats para criação, edição e exclusão com driver PTY determinístico; CI valida sintaxe Bash/Python e executa a suíte comportamental completa (21 testes em 2026-10-29).
+- [x] Testes Bats para criação, edição e exclusão com driver PTY determinístico; CI valida sintaxe Bash/Python e executa a suíte comportamental completa (31 testes em 2026-10-29).
 
 ## Resultado da última execução de testes
 
@@ -112,6 +112,6 @@ A lista é um plano de trabalho, não uma afirmação de que todos os comandos d
 
 ## Atualização 2026-10-29
 
-- Código dividido em `lib/` (ver README); suíte atual: 5 arquivos Bats, 26 testes + `tests/pty_driver.py`.
+- Código dividido em `lib/` e montado por `build.sh` em `bin/npass-tui` (arquivo único, como o npass-store; ver README); suíte atual: 6 arquivos Bats, 31 testes + `tests/pty_driver.py`.
 - Concluído: sanitização na confirmação de exclusão, filtro de identidades, estabilização de `edit-fail`, estado vazio de entradas/identidades, checagem de versão do `npass` (2.x ≥ 2.8), CI em `main` e `master`.
 - Próximo: `npass generate`, depois `npass mv`.

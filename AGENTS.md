@@ -8,7 +8,8 @@ Este repositório contém uma interface de terminal (TUI) em Bash para o `npass`
 
 | Tarefa | Arquivo inicial |
 |---|---|
-| Interface, teclado, telas e fluxo principal | `npass-tui` |
+| Interface, teclado, telas e fluxo principal | `lib/*.bash` (entrada e loop em `lib/99-main.bash`) |
+| Montagem e instalação | `build.sh` (gera `bin/npass-tui`), `install.sh` |
 | Auditoria dos contratos da CLI e decisões de integração | `docs/CLI-AUDIT.md` |
 | Plano de funcionalidades pendentes | `IMPLEMENTATION-ROADMAP.md` |
 | Testes de fluxos TUI | `tests/entry-create.bats`, `tests/entry-edit.bats`, `tests/entry-delete.bats` |
@@ -47,10 +48,10 @@ Este repositório contém uma interface de terminal (TUI) em Bash para o `npass`
 ## Fluxo de desenvolvimento
 
 1. Leia este arquivo e a seção correspondente de `IMPLEMENTATION-ROADMAP.md`.
-2. Inspecione apenas o trecho de `npass-tui` e os testes relacionados à mudança.
+2. Inspecione apenas o trecho de `lib/` e os testes relacionados à mudança.
 3. Antes ou junto da implementação, defina os comportamentos esperados e escreva/atualize os testes com um executável `npass` simulado.
 4. Implemente a menor alteração que satisfaça os testes, sem ampliar o escopo sem necessidade.
-5. Valide sintaxe com `bash -n npass-tui` e execute os testes relevantes; execute a suíte completa e o CI quando possível.
+5. Valide sintaxe com `bash build.sh && bash -n bin/npass-tui` e execute os testes relevantes; execute a suíte completa e o CI quando possível.
 6. Atualize `README.md` e o roadmap quando atalhos ou comportamentos mudarem.
 7. Não declare testes interativos aprovados se só foi validada a sintaxe. Testes com PTY/mock não substituem validação manual em terminal real.
 
@@ -64,4 +65,4 @@ Este repositório contém uma interface de terminal (TUI) em Bash para o `npass`
 
 ## Estrutura de código
 
-Lógica em `lib/NN-nome.bash` (carregadas em ordem); `npass-tui` só faz checagens, carrega libs e roda `main_loop`. Todo texto vindo da CLI deve passar por `sanitize_text`/`put`. Terminal cooked para filhos interativos: `cooked_mode`; de volta: `raw_mode`.
+Lógica em `lib/NN-nome.bash`, concatenada em ordem por `build.sh` no arquivo único `bin/npass-tui` (gerado, no `.gitignore`; **nunca edite `bin/`**). `lib/99-main.bash` (sempre o último) faz as checagens de ambiente e roda `main_loop`. Libs não podem ter efeitos colaterais ao serem carregadas além de definir funções e variáveis, porque os testes as carregam isoladamente com `source`. Todo texto vindo da CLI deve passar por `sanitize_text`/`put`. Terminal cooked para filhos interativos: `cooked_mode`; de volta: `raw_mode`.

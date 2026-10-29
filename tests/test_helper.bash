@@ -1,7 +1,25 @@
 #!/usr/bin/env bash
 
+# Garante um bin/npass-tui atual. bin/ está no .gitignore, então num clone novo
+# ele não existe até alguém rodar ./build.sh. Reconstrói também se algum
+# lib/*.bash ou o build.sh for mais novo que o binário gerado.
+tui_test_build() {
+  local stale=0 f
+  if [[ ! -x $TUI ]]; then
+    stale=1
+  else
+    for f in "$ROOT"/lib/*.bash "$ROOT/build.sh"; do
+      [[ $f -nt $TUI ]] && { stale=1; break; }
+    done
+  fi
+  (( stale )) || return 0
+  bash "$ROOT/build.sh" >/dev/null
+}
+
 setup() {
   ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+  TUI="$ROOT/bin/npass-tui"
+  tui_test_build
   TMP="$BATS_TEST_TMPDIR"
   MOCK_NPASS="$TMP/npass"
   LOG="$TMP/argv.log"
@@ -84,7 +102,7 @@ run_tui() {
     MOCK_OTP_FAIL="${MOCK_OTP_FAIL:-0}" \
     MOCK_ACTION_EXIT="${MOCK_ACTION_EXIT:-0}" \
     MOCK_VERSION="${MOCK_VERSION:-2.8}" \
-    python3 "$ROOT/tests/pty_driver.py" "$scenario" "$ROOT/npass-tui" \
+    python3 "$ROOT/tests/pty_driver.py" "$scenario" "$TUI" \
     >"$PTY_OUT" 2>&1; then
     cat "$PTY_OUT" >&2
     return 1
