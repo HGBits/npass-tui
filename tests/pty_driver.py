@@ -189,6 +189,14 @@ def main():
             read_until('Digite exatamente "sim"')
             send("nao\n")
             read_until("Exclusão cancelada.")
+        elif scenario == "delete-control":
+            send("d")
+            read_until('Digite exatamente "sim"')
+            if b"PWNED-PATH" in output or b"PWNED-IDENTITY" in output:
+                print("untrusted identity/path control sequence reached delete confirmation", file=sys.stderr)
+                return 1
+            send("nao\n")
+            read_until("Exclusão cancelada.")
         elif scenario == "show-fail-secret":
             send("\r")
             read_until("Erro ao abrir entrada (código 17)")
@@ -263,6 +271,7 @@ def main():
             "otp-fail-secret": "Entradas",
             "delete": "Comando npass rm concluído",
             "delete-cancel": "Exclusão cancelada.",
+            "delete-control": "Exclusão cancelada.",
             "control-output": "Entradas",
             "path-spaces": "Comando npass clip concluído.",
         }[scenario]
