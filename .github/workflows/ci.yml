@@ -7,9 +7,9 @@ on:
 
 jobs:
   bash-syntax:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Install Bats
         run: |
           sudo apt-get update
