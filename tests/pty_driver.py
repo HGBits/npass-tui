@@ -26,7 +26,6 @@ def main():
     master, slave = pty.openpty()
     fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 24, 100, 0, 0))
     original_tty = termios.tcgetattr(slave)
-    original_stty = subprocess.check_output(["stty", "-g"], stdin=slave).strip()
     env = os.environ.copy()
     env["TERM"] = "xterm"
     proc = subprocess.Popen(
@@ -41,7 +40,6 @@ def main():
     os.close(slave)
     output = bytearray()
     deadline = time.monotonic() + 10
-    raw_tty_before_action = None
 
     def read_until(marker, timeout=3, after=0):
         end = min(time.monotonic() + timeout, deadline)
@@ -67,6 +65,13 @@ def main():
 
     def send(data):
         os.write(master, data.encode("utf-8"))
+
+    def flag_enabled(attrs, flag):
+        return bool(attrs[3] & flag)
+
+    def cc_value(attrs, index):
+        value = attrs[6][index]
+        return value[0] if isinstance(value, bytes) else int(value)
 
     try:
         if scenario == "identities-empty":
@@ -192,7 +197,6 @@ def main():
             send("e")
             read_until("Edição concluída")
         elif scenario == "edit-fail":
-            raw_tty_before_action = termios.tcgetattr(master)
             send("e")
             read_until("npass edit falhou (código 17)")
         elif scenario == "delete":
@@ -298,17 +302,31 @@ def main():
             send("x")
             read_until("Esc voltar", after=len(output))
         if scenario == "edit-fail":
-            if termios.tcgetattr(master) != raw_tty_before_action:
-                print("TUI terminal mode was not restored after CLI failure", file=sys.stderr)
+            tui_tty = termios.tcgetattr(master)
+            # TUI raw_mode() relies on these modes, not on every platform-
+            # specific termios flag or control character.
+            if flag_enabled(tui_tty, termios.ICANON) or flag_enabled(tui_tty, termios.ECHO):
+                print("TUI did not return to non-canonical, no-echo mode after CLI failure", file=sys.stderr)
                 return 1
+            if cc_value(tui_tty, termios.VMIN) != 1 or cc_value(tui_tty, termios.VTIME) != 0:
+                print("TUI did not restore raw-mode VMIN/VTIME after CLI failure", file=sys.stderr)
+                return 1
+
             tty_log = os.environ.get("NPASS_TTY_LOG")
             if not tty_log or not os.path.exists(tty_log):
                 print("interactive CLI terminal-mode log is missing", file=sys.stderr)
                 return 1
-            with open(tty_log, "rb") as stream:
-                cli_tty = stream.read().strip()
-            if cli_tty != original_stty:
-                print("interactive CLI did not receive the original terminal mode", file=sys.stderr)
+            with open(tty_log, "r", encoding="utf-8") as stream:
+                cli_modes = set(stream.read().splitlines())
+            expected_cli_modes = {
+                f"icanon={int(flag_enabled(original_tty, termios.ICANON))}",
+                f"echo={int(flag_enabled(original_tty, termios.ECHO))}",
+            }
+            if not expected_cli_modes.issubset(cli_modes):
+                print(
+                    "interactive CLI did not receive the original canonical/echo modes",
+                    file=sys.stderr,
+                )
                 return 1
         # In the entries screen, q returns to the identity list; it does not
         # exit the application. Send q once to go back, then once more to exit.

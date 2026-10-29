@@ -32,7 +32,16 @@ case "$1" in
       printf 'example/login\nsecond/entry\n'
     fi
     ;;
-  insert|edit|rm) stty -g >>"$NPASS_TTY_LOG"; exit "${MOCK_ACTION_EXIT:-0}" ;;
+  insert|edit|rm)
+    # Record the two terminal modes interactive commands rely on, rather than
+    # the implementation-specific full stty serialization.
+    tty_mode=$(stty -a)
+    {
+      [[ $tty_mode =~ (^|[[:space:]])icanon([[:space:]]|$) ]] && printf 'icanon=1\n' || printf 'icanon=0\n'
+      [[ $tty_mode =~ (^|[[:space:]])echo([[:space:]]|$) ]] && printf 'echo=1\n' || printf 'echo=0\n'
+    } >>"$NPASS_TTY_LOG"
+    exit "${MOCK_ACTION_EXIT:-0}"
+    ;;
   show)
     if [[ ${MOCK_SHOW_FAIL:-0} == 1 ]]; then printf 'FAIL-SECRET-SENTINEL\n'; exit 17; fi
     if [[ ${MOCK_SHOW_CONTROL:-0} == 1 ]]; then
