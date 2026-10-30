@@ -26,7 +26,7 @@ check_npass_version() {
 }
 
 load_identities() {
-    local output line ident rc
+    local output line ident info rc
     if output=$("$NPASS_BIN" identities 2>&1); then
         :
     else
@@ -35,19 +35,21 @@ load_identities() {
         return 1
     fi
     IDENTITIES=()
+    IDENT_INFO=()
     while IFS= read -r line; do
         [[ -z ${line//[[:space:]]/} ]] && continue
         # npass identities emits summaries as "NAME - N passwords". Ignore
         # other successful output (for example, its localized empty-store
         # message) instead of treating it as an identity name.
-        if [[ $line =~ ^(.*)[[:space:]]-[[:space:]]+[0-9]+[[:space:]]+(senha|senhas|password|passwords)$ ]]; then
+        if [[ $line =~ ^(.*)[[:space:]]-[[:space:]]+([0-9]+[[:space:]]+(senha|senhas|password|passwords))$ ]]; then
             ident=${BASH_REMATCH[1]}
+            info=${BASH_REMATCH[2]}
         else
             continue
         fi
         ident=${ident#"${ident%%[![:space:]]*}"}
         ident=${ident%"${ident##*[![:space:]]}"}
-        [[ -n $ident ]] && IDENTITIES+=("$ident")
+        if [[ -n $ident ]]; then IDENTITIES+=("$ident"); IDENT_INFO+=("$info"); fi
     done <<< "$output"
     if (( ${#IDENTITIES[@]} == 0 )); then
         set_status 'Nenhuma identidade encontrada.'

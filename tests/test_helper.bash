@@ -39,6 +39,8 @@ case "$1" in
     if [[ ${MOCK_IDENTITIES_EMPTY:-0} == 1 ]]; then printf 'Nenhuma identidade em /tmp/npass-test-store.\n'; exit 0; fi
     if [[ ${MOCK_IDENTITY_CONTROL:-0} == 1 ]]; then
       printf 'personal\033]0;PWNED-IDENTITY\007 - 2 senhas\n'
+    elif [[ ${MOCK_TWO_IDS:-0} == 1 ]]; then
+      printf 'personal - 2 senhas\nwork - 1 senha\n'
     else
       printf 'personal - 2 senhas\n'
     fi
@@ -47,6 +49,8 @@ case "$1" in
     if [[ ${MOCK_LS_FAIL:-0} == 1 ]]; then printf 'FAIL-SECRET-SENTINEL\n'; exit 17; fi
     if [[ ${MOCK_MANY:-0} == 1 ]]; then
       for i in $(seq -w 1 40); do printf 'entry-%s\n' "$i"; done
+    elif [[ ${MOCK_PATH_ACCENT:-0} == 1 ]]; then
+      printf 'açãoóéí/configuração-muito-longa-demais-para-caber\nsecond/entry\n'
     elif [[ ${MOCK_PATH_CONTROL:-0} == 1 ]]; then
       printf 'example/login\033]0;PWNED-PATH\007\nsecond/entry\n'
     elif [[ ${MOCK_PATH_SPACES:-0} == 1 ]]; then

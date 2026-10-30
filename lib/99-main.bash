@@ -28,10 +28,13 @@ main_loop() {
             identities:enter)
                 if (( ${#IDENTITIES[@]} > 0 )); then
                     CURRENT_ID=${IDENTITIES[CURSOR]}
+                    IDENT_CURSOR=$CURSOR IDENT_OFFSET=$OFFSET
                     SCREEN=entries; QUERY=''
                     load_paths || true
                 fi ;;
-            entries:quit|entries:back) SCREEN=identities; QUERY='' ;;
+            entries:quit|entries:back)
+                SCREEN=identities; QUERY=''
+                CURSOR=$IDENT_CURSOR OFFSET=$IDENT_OFFSET ;;
             entries:up) (( CURSOR > 0 )) && ((CURSOR--)) ;;
             entries:down) (( CURSOR + 1 < ${#VISIBLE[@]} )) && ((CURSOR++)) ;;
             entries:search) search_prompt ;;

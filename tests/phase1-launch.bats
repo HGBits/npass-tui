@@ -33,7 +33,7 @@ def wait_for(marker, timeout=5.0):
 def fail(msg):
     sys.stderr.write(msg + "\n--- saída da TUI ---\n" + buf.decode("utf-8", "replace") + "\n")
     sys.exit(1)
-if not wait_for("Escolha uma identidade"): fail("TUI não abriu a lista de identidades")
+if not wait_for("IDENTIDADES"): fail("TUI não abriu a lista de identidades")
 mark = len(buf)
 os.write(fd, b"\r")
 if not wait_for("Identidade sem entradas"): fail("estado vazio não apareceu")

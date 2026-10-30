@@ -13,10 +13,17 @@ TOO_SMALL=0
 
 MIN_ROWS=10
 MIN_COLS=40
+# Split view needs room for both panes; below that the layout is compact and
+# shows one pane at a time.
+EX_MIN=24
+CT_MIN=24
 
-# Geometry, recomputed by compute_layout().
+# Geometry, recomputed by compute_layout(). Explorer on the left (~40%),
+# Context on the right, a one-cell separator between them.
 HDR_ROW=0 RULE_TOP=1 TITLE_ROW=2 BODY_TOP=3 BODY_H=0 RULE_BOT=0 STATUS_ROW=0 KEYS_ROW=0
-EX_COL=0 EX_W=0 CT_COL=0 CT_W=0
+SPLIT=0 EX_COL=0 EX_W=0 CT_COL=0 CT_W=0
+RULE_TOP_TXT='' RULE_BOT_TXT=''
+CTX=() CTX_A=()   # lines (and their attributes) of the Context pane
 
 render_init() {
     [[ $(tput cup 0 0 2>/dev/null) == $'\033[1;1H' && $(tput cup 11 79 2>/dev/null) == $'\033[12;80H' ]] && CUP_STD=1
@@ -74,7 +81,21 @@ compute_layout() {
     RULE_BOT=$((ROWS - 3))
     STATUS_ROW=$((ROWS - 2))
     KEYS_ROW=$((ROWS - 1))
-    EX_COL=0 EX_W=$COLS CT_COL=0 CT_W=0
+    EX_COL=0
+    if (( COLS >= EX_MIN + 1 + CT_MIN )); then
+        SPLIT=1
+        EX_W=$((COLS * 40 / 100))
+        (( EX_W >= EX_MIN )) || EX_W=$EX_MIN
+        (( EX_W <= COLS - 1 - CT_MIN )) || EX_W=$((COLS - 1 - CT_MIN))
+        CT_COL=$((EX_W + 1))
+        CT_W=$((COLS - CT_COL))
+        RULE_TOP_TXT=${HRULE:0:EX_W}$G_TD${HRULE:CT_COL}
+        RULE_BOT_TXT=${HRULE:0:EX_W}$G_TU${HRULE:CT_COL}
+    else
+        SPLIT=0
+        EX_W=$COLS CT_COL=0 CT_W=$COLS
+        RULE_TOP_TXT=$HRULE RULE_BOT_TXT=$HRULE
+    fi
 }
 
 # Keep CURSOR inside the list and the list window (OFFSET) around it.
@@ -133,50 +154,136 @@ draw_header() {
         otp) where="COFRE / $CURRENT_ID / OTP" ;;
     esac
     paint "$HDR_ROW" 0 "$COLS" " npass-tui  $where" "$BOLD$REV"
-    paint "$RULE_TOP" 0 "$COLS" "${HRULE:0:COLS}"
+    paint "$RULE_TOP" 0 "$COLS" "$RULE_TOP_TXT"
 }
 
 draw_footer() {
-    paint "$RULE_BOT" 0 "$COLS" "${HRULE:0:COLS}"
+    paint "$RULE_BOT" 0 "$COLS" "$RULE_BOT_TXT"
     paint "$STATUS_ROW" 0 "$COLS" "$STATUS" "$DIM"
     footer_keys
     paint "$KEYS_ROW" 0 "$COLS" "$FOOTER_TEXT"
 }
 
-# draw_list TITLE ARRAY_NAME EMPTY_MESSAGE
-draw_list() {
-    local title=$1 empty_msg=${3:-} i idx text
-    local -n items=$2
-    clamp_view "${#items[@]}"
+# The Explorer lists identities, or the entries of the current identity once one
+# is open. While a preview/OTP is on the right, the Explorer keeps showing the
+# list but the selection is only bold: the focus is on the right.
+draw_explorer() {
+    local title empty_msg='' i idx row n
+    local src=IDENTITIES attr_sel=$REV
+    case $SCREEN in
+        identities)
+            title='IDENTIDADES'
+            empty_msg='Nenhuma identidade. Crie uma com: npass init' ;;
+        *)
+            src=VISIBLE title='ENTRADAS'
+            if [[ -n $QUERY ]]; then
+                empty_msg='Nenhuma entrada corresponde ao filtro. Use / com valor vazio para remover.'
+            else
+                empty_msg='Identidade sem entradas. Pressione a para criar a primeira.'
+            fi ;;
+    esac
+    [[ $SCREEN == preview || $SCREEN == otp ]] && attr_sel=$BOLD
+    local -n items=$src
+    n=${#items[@]}
+    clamp_view "$n"
+    (( n > 0 )) && title+="  $((CURSOR + 1))/$n"
+    [[ $src == VISIBLE && -n $QUERY ]] && title+="  filtro: $QUERY"
     paint "$TITLE_ROW" "$EX_COL" "$EX_W" " $title" "$BOLD"
     for ((i = 0; i < BODY_H; i++)); do
         idx=$((OFFSET + i))
-        if (( idx < ${#items[@]} )); then
+        row=$((BODY_TOP + i))
+        if (( idx < n )); then
             if (( idx == CURSOR )); then
-                paint $((BODY_TOP + i)) "$EX_COL" "$EX_W" "> ${items[idx]}" "$REV"
+                paint "$row" "$EX_COL" "$EX_W" "> ${items[idx]}" "$attr_sel"
             else
-                paint $((BODY_TOP + i)) "$EX_COL" "$EX_W" "  ${items[idx]}"
+                paint "$row" "$EX_COL" "$EX_W" "  ${items[idx]}"
             fi
-        elif (( ${#items[@]} == 0 && i == 1 )) && [[ -n $empty_msg ]]; then
-            paint $((BODY_TOP + i)) "$EX_COL" "$EX_W" "  $empty_msg"
+        elif (( n == 0 && i == 1 )); then
+            paint "$row" "$EX_COL" "$EX_W" "  $empty_msg"
         else
-            paint $((BODY_TOP + i)) "$EX_COL" "$EX_W" ''
+            paint "$row" "$EX_COL" "$EX_W" ''
         fi
     done
 }
 
-# draw_text TITLE ARRAY_NAME OFFSET: scrollable text (preview and OTP).
+draw_separator() {
+    local r
+    (( SPLIT )) || return 0
+    for ((r = TITLE_ROW; r < RULE_BOT; r++)); do paint "$r" $((CT_COL - 1)) 1 "$G_V"; done
+}
+
+ctx_add() { CTX+=("$1"); CTX_A+=("${2:-}"); }
+
+# ctx_field LABEL VALUE: "Label:      value" with the value aligned.
+ctx_field() {
+    local label=$1
+    local pad=$((13 - ${#label}))
+    (( pad >= 1 )) || pad=1
+    ctx_add "$label${SPACES:0:pad}$2"
+}
+
+ctx_identity() {
+    local name=${IDENTITIES[CURSOR]-}
+    if [[ -z $name ]]; then
+        ctx_add 'Nenhuma identidade selecionada.'
+        return
+    fi
+    ctx_add "$name" "$BOLD"
+    ctx_add ''
+    # The count is what `npass identities` reports; it may include attachments.
+    ctx_field 'Contagem:' "${IDENT_INFO[CURSOR]-?} (segundo o npass)"
+    ctx_add ''
+    ctx_add 'Enter abre a lista de entradas.'
+}
+
+ctx_entry() {
+    local path=${VISIBLE[CURSOR]-} folder name
+    if [[ -z $path ]]; then
+        ctx_add 'Nenhuma entrada selecionada.'
+        return
+    fi
+    name=${path##*/}
+    folder='(raiz)'
+    [[ $path == */* ]] && folder=${path%/*}
+    ctx_add "$name" "$BOLD"
+    ctx_add ''
+    ctx_field 'Pasta:' "$folder"
+    ctx_field 'Identidade:' "$CURRENT_ID"
+    ctx_field 'Posição:' "$((CURSOR + 1)) de ${#VISIBLE[@]}"
+    ctx_add ''
+    ctx_field 'Proteção:' 'conteúdo oculto'
+    ctx_add "             Só é lido com Enter."
+    ctx_add ''
+    ctx_add 'Enter abrir  C copiar  O OTP'
+    ctx_add 'E editar  D excluir'
+}
+
+# draw_context TITLE: paints CTX/CTX_A (or the preview lines) into the right pane.
+draw_context() {
+    local title=$1 i row
+    paint "$TITLE_ROW" "$CT_COL" "$CT_W" " $title" "$BOLD"
+    for ((i = 0; i < BODY_H; i++)); do
+        row=$((BODY_TOP + i))
+        if (( i < ${#CTX[@]} )); then
+            paint "$row" "$CT_COL" "$CT_W" " ${CTX[i]}" "${CTX_A[i]}"
+        else
+            paint "$row" "$CT_COL" "$CT_W" ''
+        fi
+    done
+}
+
+# Scrollable text (preview and OTP) in the right pane.
 draw_text() {
     local title=$1 i row
     local -n lines=$2
     local off=$3
-    paint "$TITLE_ROW" 0 "$COLS" " $title" "$BOLD"
+    paint "$TITLE_ROW" "$CT_COL" "$CT_W" " $title" "$BOLD"
     for ((i = 0; i < BODY_H; i++)); do
         row=$((BODY_TOP + i))
         if (( off + i < ${#lines[@]} )); then
-            paint "$row" 0 "$COLS" " ${lines[off+i]}"
+            paint "$row" "$CT_COL" "$CT_W" " ${lines[off+i]}"
         else
-            paint "$row" 0 "$COLS" ''
+            paint "$row" "$CT_COL" "$CT_W" ''
         fi
     done
 }
@@ -200,23 +307,24 @@ render() {
         flush
         return
     fi
-    local empty
     draw_header
     case $SCREEN in
-        identities)
-            draw_list 'Escolha uma identidade' IDENTITIES 'Nenhuma identidade. Crie uma com: npass init' ;;
-        entries)
-            if [[ -n $QUERY ]]; then
-                empty='Nenhuma entrada corresponde ao filtro. Use / com valor vazio para remover.'
+        identities | entries)
+            draw_explorer
+            if (( SPLIT )); then
+                CTX=() CTX_A=()
+                if [[ $SCREEN == identities ]]; then ctx_identity; else ctx_entry; fi
+                draw_context 'CONTEXTO'
+            fi ;;
+        preview | otp)
+            (( SPLIT )) && draw_explorer
+            if [[ $SCREEN == preview ]]; then
+                draw_text 'CONTEÚDO' PREVIEW_LINES "$PREVIEW_OFFSET"
             else
-                empty='Identidade sem entradas. Pressione a para criar a primeira.'
-            fi
-            draw_list "Entradas  |  filtro: ${QUERY:-nenhum}" VISIBLE "$empty" ;;
-        preview)
-            draw_text 'Conteúdo da entrada' PREVIEW_LINES "$PREVIEW_OFFSET" ;;
-        otp)
-            draw_text 'Código OTP' OTP_LINES 0 ;;
+                draw_text 'CÓDIGO OTP' OTP_LINES 0
+            fi ;;
     esac
+    draw_separator
     draw_footer
     flush
 }

@@ -154,7 +154,7 @@ def cc_value(attrs, index):
 # ---------------------------------------------------------------------------
 # Marcadores da UI. Ficam num só lugar: quando a tela muda, muda aqui.
 # ---------------------------------------------------------------------------
-IDENTITIES_TITLE = "Escolha uma identidade"
+IDENTITIES_TITLE = "IDENTIDADES"
 FOOT_IDENTITIES = "Q Sair"
 FOOT_ENTRIES = "Esc Voltar"
 
@@ -164,7 +164,7 @@ def wait_identities(s):
 
 
 def wait_entries(s):
-    s.wait_text("Entradas", FOOT_ENTRIES)
+    s.wait_text("ENTRADAS", "Enter Abrir", FOOT_ENTRIES)
 
 
 def quit_tui(s):
@@ -412,7 +412,7 @@ def sc_control_output(s):
     open_identity(s)
     s.read_until("example/login")
     s.send("\r")
-    s.read_until("Conteúdo da entrada")
+    s.read_until("CONTEÚDO")
     content_end = s.read_until("safe-line")
     if s.raw_has("PWNED-TITLE") or s.raw_has("\x1b[?9999h"):
         raise Fail("untrusted CLI control sequence reached the terminal")
@@ -470,7 +470,7 @@ def sc_footer_preview(s):
     open_identity(s)
     wait_entries(s)
     s.send("\r")
-    s.wait_text("Conteúdo da entrada", "Rolar")
+    s.wait_text("CONTEÚDO", "Rolar")
     foot = last_row(s)
     need("Esc Voltar" in foot and "C Copiar" in foot, "rodapé do preview incompleto: %r" % foot)
     for key in ("Filtrar", "Criar", "Excluir", "Navegar"):
@@ -485,7 +485,7 @@ def sc_footer_otp(s):
     open_identity(s)
     wait_entries(s)
     s.send("o")
-    s.wait_text("Código OTP", SECRET_OTP, "Qualquer tecla Voltar")
+    s.wait_text("CÓDIGO OTP", SECRET_OTP, "Qualquer tecla Voltar")
     need("Filtrar" not in last_row(s), "rodapé do OTP mostra atalhos de entradas")
     s.send("x")
     wait_entries(s)
@@ -561,16 +561,17 @@ def sc_render_nav(s):
     s.wait_screen(lambda sc: selected_rows(sc) == [4], "seleção desceu uma linha")
     chunk = sent_since(s, m)
     need(CLEAR_SEQ not in chunk, "a tela foi limpa ao mover a seleção")
-    need(len(CUP_RE.findall(chunk)) <= 2,
-         "mover a seleção sem rolar deveria redesenhar 2 linhas: %r" % chunk)
-    for stale in (b"npass-tui", b"Navegar", b"Entradas", b"Esc Voltar"):
+    # duas linhas da lista + contador no título + linhas do contexto que mudam
+    need(len(CUP_RE.findall(chunk)) <= 8,
+         "mover a seleção sem rolar deveria redesenhar só seleção e contexto: %r" % chunk)
+    for stale in (b"npass-tui", b"Navegar", b"Esc Voltar", b"\xe2\x94\x80"):
         need(stale not in chunk, "região que não mudou foi redesenhada: %r" % stale)
-    need(len(chunk) < 400, "atualização grande demais para mover a seleção: %d bytes" % len(chunk))
+    need(len(chunk) < 900, "atualização grande demais para mover a seleção: %d bytes" % len(chunk))
     m = s.mark()
     s.send("k")
     s.wait_screen(lambda sc: selected_rows(sc) == [3], "seleção subiu uma linha")
     chunk = sent_since(s, m)
-    need(CLEAR_SEQ not in chunk and len(CUP_RE.findall(chunk)) <= 2, "subir redesenhou demais")
+    need(CLEAR_SEQ not in chunk and len(CUP_RE.findall(chunk)) <= 8, "subir redesenhou demais")
     need(not s.screen.scrolled and not s.screen.overflow, "tela rolou ou passou da coluna")
     quit_tui(s)
 
@@ -588,10 +589,10 @@ def sc_render_scroll(s):
     need(selected_rows(s.screen) == [body_last], "seleção deveria ficar na última linha visível")
     chunk = sent_since(s, m)
     need(CLEAR_SEQ not in chunk, "a tela foi limpa ao rolar")
-    for stale in (b"npass-tui", b"Navegar", b"Esc Voltar", b"Entradas"):
-        need(stale not in chunk, "header/footer redesenhados ao rolar: %r" % stale)
+    for stale in (b"npass-tui", b"Navegar", b"Esc Voltar", b"\xe2\x94\x80"):
+        need(stale not in chunk, "header/rodapé/réguas redesenhados ao rolar: %r" % stale)
     need(b"entry-19" in chunk, "a linha nova não foi desenhada")
-    need(len(CUP_RE.findall(chunk)) <= s.rows - 6, "rolagem redesenhou mais que a lista")
+    need(len(CUP_RE.findall(chunk)) <= s.rows, "rolagem redesenhou mais que lista, título e contexto")
     for _ in range(17):
         s.send("k")
     s.wait_screen(lambda sc: sc.has("entry-02") and selected_rows(sc) == [3], "voltou ao topo da janela")
@@ -652,7 +653,7 @@ def sc_render_attrs(s):
     s.send("j")
     s.wait_screen(lambda sc: selected_rows(sc) == [4], "seleção desceu")
     s.send("\r")
-    s.wait_text("Conteúdo da entrada", "Rolar")
+    s.wait_text("CONTEÚDO", "Rolar")
     s.send("q")
     wait_entries(s)
     s.send("o")
@@ -664,7 +665,120 @@ def sc_render_attrs(s):
     quit_tui(s)
 
 
+GLYPHS_UNICODE = "─│┬┴…↑↓"
+
+
+def col_of(screen, row, ch):
+    return [c for c in range(screen.cols) if screen.grid[row][c] == ch]
+
+
+def sc_layout_split(s):
+    wait_identities(s)
+    s.wait_text("CONTEXTO", "Contagem:")
+    need(col_of(s.screen, 1, "┬") == [40], "junção superior fora da coluna 40: %r" % col_of(s.screen, 1, "┬"))
+    need(col_of(s.screen, s.rows - 3, "┴") == [40], "junção inferior fora da coluna 40")
+    for r in range(2, s.rows - 3):
+        need(s.screen.grid[r][40] == "│", "separador vertical ausente na linha %d" % r)
+    need(s.screen.line(2).startswith(" IDENTIDADES"), "título do Explorer ausente")
+    need(s.screen.line(2)[41:].startswith(" CONTEXTO"), "título do Contexto ausente")
+    need("personal" in s.screen.line(3)[41:], "contexto não mostra a identidade selecionada")
+    need("2 senhas (segundo o npass)" in s.screen.text(), "contagem do npass ausente")
+    need(not s.screen.overflow and not s.screen.scrolled, "tela rolou ou passou da coluna")
+    s.send("q")
+    check_clean_exit(s, "layout-split")
+
+
+def sc_layout_compact(s):
+    wait_identities(s)
+    need("CONTEXTO" not in s.screen.text(), "modo compacto não deveria mostrar o Contexto")
+    need("│" not in s.screen.text(), "modo compacto não deveria ter separador vertical")
+    s.send("\r")
+    s.wait_text("ENTRADAS", "example/login")
+    s.send("\r")
+    s.wait_text("CONTEÚDO", "Rolar")
+    need("ENTRADAS" not in s.screen.text(), "no preview compacto o Contexto ocupa a largura toda")
+    need(s.screen.line(2).startswith(" CONTEÚDO"), "título do preview deveria começar na coluna 0")
+    s.send("q")
+    s.wait_text("ENTRADAS", "Enter Abrir")
+    need("CONTEÚDO" not in s.screen.text(), "preview ficou na tela depois de voltar")
+    need(not s.screen.overflow and not s.screen.scrolled, "tela rolou ou passou da coluna")
+    quit_tui(s)
+
+
+def sc_layout_boundary(s):
+    s.wait_text("CONTEXTO")
+    s.resize(24, 48)
+    s.wait_screen(lambda sc: "IDENTIDADES" in sc.text() and "CONTEXTO" not in sc.text(), "compacto em 48 colunas")
+    s.resize(24, 49)
+    s.wait_text("CONTEXTO")
+    need(not s.screen.overflow and not s.screen.scrolled, "tela rolou ou passou da coluna")
+    s.send("q")
+    check_clean_exit(s, "layout-boundary")
+
+
+def sc_layout_ascii(s):
+    wait_identities(s)
+    s.wait_text("CONTEXTO", "Up/Dn Navegar")
+    for glyph in GLYPHS_UNICODE:
+        need(not s.raw_has(glyph), "glifo Unicode %r emitido no modo ASCII" % glyph)
+    need(col_of(s.screen, 1, "+") == [40] and col_of(s.screen, s.rows - 3, "+") == [40],
+         "junções ASCII fora do lugar")
+    need(s.screen.grid[5][40] == "|", "separador ASCII ausente")
+    need(s.screen.line(1).replace("+", "-").strip("-") == "", "régua ASCII com caracteres estranhos")
+    s.send("\r")
+    s.wait_text("ENTRADAS", "example/login")
+    for glyph in GLYPHS_UNICODE:
+        need(not s.raw_has(glyph), "glifo Unicode %r emitido no modo ASCII" % glyph)
+    quit_tui(s)
+
+
+def sc_layout_identity_cursor(s):
+    s.wait_text("personal", "work")
+    s.send("j")
+    s.wait_screen(lambda sc: selected_rows(sc) == [4] and "work" in sc.line(3)[41:] + sc.line(4)[41:], "work selecionada")
+    s.send("\r")
+    s.wait_text("ENTRADAS", "example/login")
+    need("work" in s.screen.line(0), "cabeçalho deveria nomear a identidade work")
+    s.send("q")
+    wait_identities(s)
+    need(selected_rows(s.screen) == [4], "voltar às identidades perdeu a seleção: %r" % selected_rows(s.screen))
+    need("work" in s.screen.line(4), "linha selecionada deveria ser work")
+    s.send("q")
+    check_clean_exit(s, "layout-identity-cursor")
+
+
+def sc_layout_accent(s):
+    open_identity(s)
+    s.wait_text("ENTRADAS", "second/entry")
+    row = s.screen.line(3)
+    need("\ufffd" not in s.screen.text(), "caractere cortado no meio (UTF-8 inválido)")
+    need(row[:40].rstrip().endswith("…") or "…" in row[:25], "caminho longo deveria terminar em reticências: %r" % row)
+    need(not s.screen.overflow, "texto passou da coluna: %r" % s.screen.overflow)
+    quit_tui(s)
+
+
+def sc_context_entry(s):
+    open_identity(s)
+    s.wait_text("ENTRADAS", "CONTEXTO", "login")
+    text = s.screen.text()
+    for want in ("Pasta:", "example", "Identidade:", "personal", "Posição:", "1 de 2", "conteúdo oculto"):
+        need(want in text, "contexto da entrada sem %r" % want)
+    s.send("j")
+    s.wait_text("2 de 2", "entry")
+    need("1 de 2" not in s.screen.text(), "contexto antigo ficou na tela")
+    right = "\n".join(s.screen.line(r)[41:] for r in range(s.rows))
+    need("login" not in right and "example" not in right, "restos da entrada anterior no contexto")
+    quit_tui(s)
+
+
 SCENARIOS = {
+    "layout-split": sc_layout_split,
+    "layout-compact": sc_layout_compact,
+    "layout-boundary": sc_layout_boundary,
+    "layout-ascii": sc_layout_ascii,
+    "layout-identity-cursor": sc_layout_identity_cursor,
+    "layout-accent": sc_layout_accent,
+    "context-entry": sc_context_entry,
     "render-nav": sc_render_nav,
     "render-scroll": sc_render_scroll,
     "render-resize": sc_render_resize,
