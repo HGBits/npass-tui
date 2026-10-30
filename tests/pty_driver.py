@@ -41,6 +41,7 @@ class Session:
         self.original_tty = termios.tcgetattr(slave)
         env = os.environ.copy()
         env["TERM"] = "xterm"
+        env["LC_ALL"] = os.environ.get("PTY_LOCALE", "C.UTF-8")
         env.pop("LINES", None)
         env.pop("COLUMNS", None)
         self.proc = subprocess.Popen(
@@ -154,15 +155,16 @@ def cc_value(attrs, index):
 # Marcadores da UI. Ficam num só lugar: quando a tela muda, muda aqui.
 # ---------------------------------------------------------------------------
 IDENTITIES_TITLE = "Escolha uma identidade"
-FOOTER_MARK = "Esc voltar"
+FOOT_IDENTITIES = "Q Sair"
+FOOT_ENTRIES = "Esc Voltar"
 
 
 def wait_identities(s):
-    s.wait_text(IDENTITIES_TITLE, FOOTER_MARK)
+    s.wait_text(IDENTITIES_TITLE, FOOT_IDENTITIES)
 
 
 def wait_entries(s):
-    s.wait_text("Entradas", FOOTER_MARK)
+    s.wait_text("Entradas", FOOT_ENTRIES)
 
 
 def quit_tui(s):
@@ -195,7 +197,7 @@ def open_identity(s):
 # ---------------------------------------------------------------------------
 def sc_identities_empty(s):
     s.wait_text(IDENTITIES_TITLE)
-    s.wait_text("Nenhuma identidade encontrada.", FOOTER_MARK)
+    s.wait_text("Nenhuma identidade encontrada.", FOOT_IDENTITIES)
     if s.raw_has("Nenhuma identidade em /tmp/npass-test-store."):
         raise Fail("CLI empty-store message was rendered as an identity")
     s.send("q")
@@ -203,7 +205,7 @@ def sc_identities_empty(s):
 
 
 def sc_identities_fail(s):
-    s.wait_text("Erro ao listar identidades (código 17)", FOOTER_MARK)
+    s.wait_text("Erro ao listar identidades (código 17)", FOOT_IDENTITIES)
     if s.raw_has(FAIL_SENTINEL):
         raise Fail("identity-list failure output leaked into the terminal")
     s.send("q")
@@ -214,7 +216,7 @@ def sc_signal(signal_number, expected_code, name):
     def run(s):
         start(s)
         # Wait for a complete frame so cleanup is tested while idle in read_key().
-        s.wait_text(FOOTER_MARK)
+        s.wait_text(FOOT_IDENTITIES)
         os.kill(s.proc.pid, signal_number)
         code = s.wait_exit()
         s.settle()
@@ -229,7 +231,7 @@ def sc_signal(signal_number, expected_code, name):
 
 def sc_exit_cleanup(s):
     start(s)
-    s.wait_text(FOOTER_MARK)
+    s.wait_text(FOOT_IDENTITIES)
     s.send("q")
     code = s.wait_exit()
     s.settle()
@@ -243,7 +245,7 @@ def sc_exit_cleanup(s):
 
 def sc_ls_fail(s):
     open_identity(s)
-    s.wait_text("Erro ao listar entradas (código 17)", FOOTER_MARK)
+    s.wait_text("Erro ao listar entradas (código 17)", FOOT_ENTRIES)
     if s.raw_has(FAIL_SENTINEL):
         raise Fail("path-list failure output leaked into the terminal")
     quit_tui(s)
@@ -252,7 +254,7 @@ def sc_ls_fail(s):
 def sc_path_control(s):
     open_identity(s)
     s.read_until("example/login")
-    s.wait_text(FOOTER_MARK)
+    s.wait_text(FOOT_ENTRIES)
     if s.raw_has("PWNED-PATH") or s.raw_has("\x1b]0;PWNED-PATH\x07"):
         raise Fail("untrusted path control sequence reached the terminal")
     quit_tui(s)
@@ -262,7 +264,7 @@ def sc_path_spaces(s):
     open_identity(s)
     s.read_until("dir with spaces/login entry")
     s.send("c")
-    s.wait_text("Comando npass clip concluído.", FOOTER_MARK)
+    s.wait_text("Comando npass clip concluído.", FOOT_ENTRIES)
     # Successful clip uses show_message(), which consumes one dismissal key.
     s.send("x")
     wait_entries(s)
@@ -275,7 +277,7 @@ def sc_create(s):
     s.send("a")
     s.read_until("Caminho da nova entrada")
     s.send("new/site\n")
-    s.wait_text("Entrada enviada ao npass", FOOTER_MARK)
+    s.wait_text("Entrada enviada ao npass", FOOT_ENTRIES)
     quit_tui(s)
 
 
@@ -285,7 +287,7 @@ def sc_cancel(s):
     s.send("a")
     s.read_until("Caminho da nova entrada")
     s.send("\n")
-    s.wait_text("Criação cancelada.", FOOTER_MARK)
+    s.wait_text("Criação cancelada.", FOOT_ENTRIES)
     quit_tui(s)
 
 
@@ -293,7 +295,7 @@ def sc_edit(s):
     open_identity(s)
     s.read_until("example/login")
     s.send("e")
-    s.wait_text("Edição concluída", FOOTER_MARK)
+    s.wait_text("Edição concluída", FOOT_ENTRIES)
     quit_tui(s)
 
 
@@ -301,7 +303,7 @@ def sc_edit_fail(s):
     open_identity(s)
     s.read_until("example/login")
     s.send("e")
-    s.wait_text("npass edit falhou (código 17)", FOOTER_MARK)
+    s.wait_text("npass edit falhou (código 17)", FOOT_ENTRIES)
     tui_tty = s.tty_attrs()
     # TUI raw_mode() relies on these modes, not on every platform-
     # specific termios flag or control character.
@@ -329,7 +331,7 @@ def sc_delete(s):
     s.send("d")
     s.read_until('Digite exatamente "sim"')
     s.send("sim\n")
-    s.wait_text("Comando npass rm concluído", FOOTER_MARK)
+    s.wait_text("Comando npass rm concluído", FOOT_ENTRIES)
     quit_tui(s)
 
 
@@ -339,7 +341,7 @@ def sc_delete_cancel(s):
     s.send("d")
     s.read_until('Digite exatamente "sim"')
     s.send("nao\n")
-    s.wait_text("Exclusão cancelada.", FOOTER_MARK)
+    s.wait_text("Exclusão cancelada.", FOOT_ENTRIES)
     quit_tui(s)
 
 
@@ -351,7 +353,7 @@ def sc_delete_control(s):
     if s.raw_has("PWNED-PATH") or s.raw_has("PWNED-IDENTITY"):
         raise Fail("untrusted identity/path control sequence reached delete confirmation")
     s.send("nao\n")
-    s.wait_text("Exclusão cancelada.", FOOTER_MARK)
+    s.wait_text("Exclusão cancelada.", FOOT_ENTRIES)
     quit_tui(s)
 
 
@@ -423,7 +425,122 @@ def sc_control_output(s):
     quit_tui(s)
 
 
+def last_row(s):
+    return s.screen.line(s.rows - 1).rstrip()
+
+
+def status_row(s):
+    return s.screen.line(s.rows - 2).rstrip()
+
+
+def count(s, needle):
+    return s.screen.text().count(needle)
+
+
+def need(cond, msg):
+    if not cond:
+        raise Fail(msg)
+
+
+def sc_footer_identities(s):
+    wait_identities(s)
+    foot = last_row(s)
+    for key in ("↑↓ Navegar", "Enter Abrir", "Q Sair"):
+        need(key in foot, "rodapé de identidades sem %r: %r" % (key, foot))
+    for key in ("Excluir", "Filtrar", "Criar", "Editar", "OTP"):
+        need(key not in foot, "rodapé de identidades mostra atalho inaplicável %r" % key)
+    need(status_row(s) == "", "linha de status deveria estar vazia: %r" % status_row(s))
+    need(count(s, "Navegar") == 1, "atalhos duplicados na tela")
+    s.send("q")
+    check_clean_exit(s, "footer-identities")
+
+
+def sc_footer_entries(s):
+    open_identity(s)
+    wait_entries(s)
+    foot = last_row(s)
+    for key in ("↑↓ Navegar", "Enter Abrir", "/ Filtrar", "A Criar", "E Editar",
+                "D Excluir", "C Copiar", "O OTP", "Esc Voltar"):
+        need(key in foot, "rodapé de entradas sem %r: %r" % (key, foot))
+    need(status_row(s) == "", "linha de status deveria estar vazia: %r" % status_row(s))
+    need(count(s, "Navegar") == 1, "atalhos duplicados na tela")
+    need(count(s, "Excluir") == 1, "atalhos duplicados na tela")
+    quit_tui(s)
+
+
+def sc_footer_preview(s):
+    open_identity(s)
+    wait_entries(s)
+    s.send("\r")
+    s.wait_text("Conteúdo da entrada", "Rolar")
+    foot = last_row(s)
+    need("Esc Voltar" in foot and "C Copiar" in foot, "rodapé do preview incompleto: %r" % foot)
+    for key in ("Filtrar", "Criar", "Excluir", "Navegar"):
+        need(key not in foot, "rodapé do preview mostra atalho inaplicável %r" % key)
+    need(count(s, "Rolar") == 1, "atalhos duplicados na tela")
+    s.send("q")
+    wait_entries(s)
+    quit_tui(s)
+
+
+def sc_footer_otp(s):
+    open_identity(s)
+    wait_entries(s)
+    s.send("o")
+    s.wait_text("Código OTP", SECRET_OTP, "Qualquer tecla Voltar")
+    need("Filtrar" not in last_row(s), "rodapé do OTP mostra atalhos de entradas")
+    s.send("x")
+    wait_entries(s)
+    need(not s.screen.has(SECRET_OTP), "OTP continuou na tela depois de voltar")
+    quit_tui(s)
+
+
+def sc_footer_narrow(s):
+    open_identity(s)
+    wait_entries(s)
+    foot = last_row(s)
+    need(len(foot) <= s.cols, "rodapé passou da largura do terminal")
+    for key in ("↑↓ Navegar", "Enter Abrir", "Esc Voltar"):
+        need(key in foot, "atalho essencial %r sumiu no terminal estreito: %r" % (key, foot))
+    need("Excluir" not in foot, "atalho de baixa prioridade deveria ter caído: %r" % foot)
+    need(not s.screen.overflow, "texto passou da última coluna: %r" % s.screen.overflow)
+    quit_tui(s)
+
+
+def sc_status_replace(s):
+    open_identity(s)
+    s.read_until("example/login")
+    s.send("e")
+    s.wait_text("Edição concluída: example/login", FOOT_ENTRIES)
+    s.send("a")
+    s.read_until("Caminho da nova entrada")
+    s.send("\n")
+    s.wait_text("Criação cancelada.", FOOT_ENTRIES)
+    row = status_row(s)
+    need(row.strip() == "Criação cancelada.", "resto do status antigo na linha: %r" % row)
+    quit_tui(s)
+
+
+def sc_status_transient(s):
+    open_identity(s)
+    s.read_until("example/login")
+    s.send("a")
+    s.read_until("Caminho da nova entrada")
+    s.send("\n")
+    s.wait_text("Criação cancelada.", FOOT_ENTRIES)
+    s.send("j")
+    s.wait_screen(lambda sc: sc.line(sc.rows - 2).strip() == "", "status limpo na tecla seguinte")
+    quit_tui(s)
+
+
 SCENARIOS = {
+    "footer-identities": sc_footer_identities,
+    "footer-entries": sc_footer_entries,
+    "footer-preview": sc_footer_preview,
+    "footer-otp": sc_footer_otp,
+    "footer-narrow": sc_footer_narrow,
+    "status-replace": sc_status_replace,
+    "status-transient": sc_status_transient,
     "identities-empty": sc_identities_empty,
     "identities-fail": sc_identities_fail,
     "signal-term": sc_signal(signal.SIGTERM, 143, "SIGTERM"),

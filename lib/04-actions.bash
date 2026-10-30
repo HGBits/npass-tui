@@ -19,15 +19,19 @@ run_action() {
                 show_message "Falha ao obter OTP (código $rc)."
                 return
             fi
-            PREVIEW_LINES=()
-            while IFS= read -r line; do PREVIEW_LINES+=("$line"); done <<< "$output"
-            SCREEN=preview
-            set_status "OTP de $path (qualquer tecla volta)"
-            render_preview
+            OTP_LINES=()
+            while IFS= read -r line; do OTP_LINES+=("$line"); done <<< "$output"
+            output=''
+            # The code lives only in OTP_LINES and on the OTP screen, never in the
+            # status line. Any key returns to where the person was.
+            OTP_RETURN=$SCREEN
+            SCREEN=otp
+            set_status "OTP de $path"
+            render_current
             IFS= read -r -s -n 1
-            SCREEN=entries
-            PREVIEW_LINES=()
-            PREVIEW_OFFSET=0 ;;
+            SCREEN=$OTP_RETURN
+            OTP_LINES=()
+            STATUS='' ;;
     esac
 }
 
@@ -44,7 +48,6 @@ open_preview() {
     while IFS= read -r line; do PREVIEW_LINES+=("$line"); done <<< "$content"
     SCREEN=preview
     PREVIEW_OFFSET=0
-    set_status "$path  |  ↑/↓ rolar  c copiar  o OTP  Esc voltar"
     render_preview
 }
 

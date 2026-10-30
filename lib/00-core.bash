@@ -10,7 +10,8 @@ CYAN=$(tput setaf 6 2>/dev/null || printf '')
 SCREEN=identities
 CURRENT_ID=''
 QUERY=''
-STATUS='↑/↓ navegar  Enter abrir  a nova entrada  e editar  d excluir  c copiar  o OTP  q sair'
+# Transient message shown above the shortcut line; shortcuts never live here.
+STATUS=''
 CURSOR=0
 OFFSET=0
 IDENTITIES=()
@@ -18,6 +19,8 @@ PATHS=()
 VISIBLE=()
 PREVIEW_LINES=()
 PREVIEW_OFFSET=0
+OTP_LINES=()
+OTP_RETURN=entries
 ROWS=24
 COLS=80
 

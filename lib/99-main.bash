@@ -11,6 +11,8 @@ main_loop() {
     while :; do
         render_current
         read_key
+        # STATUS is a transient message: it lasts until the next key press.
+        STATUS=''
         case $SCREEN:$REPLY in
             identities:quit) break ;;
             identities:up) (( CURSOR > 0 )) && ((CURSOR--)) ;;
@@ -19,11 +21,9 @@ main_loop() {
                 if (( ${#IDENTITIES[@]} > 0 )); then
                     CURRENT_ID=${IDENTITIES[CURSOR]}
                     SCREEN=entries; QUERY=''
-                    if load_paths; then
-                        set_status 'Enter abrir  c copiar senha  o OTP  / filtrar  Esc voltar'
-                    fi
+                    load_paths || true
                 fi ;;
-            entries:quit|entries:back) SCREEN=identities; QUERY=''; set_status 'Escolha uma identidade.' ;;
+            entries:quit|entries:back) SCREEN=identities; QUERY='' ;;
             entries:up) (( CURSOR > 0 )) && ((CURSOR--)) ;;
             entries:down) (( CURSOR + 1 < ${#VISIBLE[@]} )) && ((CURSOR++)) ;;
             entries:search) search_prompt ;;
