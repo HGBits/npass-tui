@@ -45,7 +45,9 @@ case "$1" in
     ;;
   ls)
     if [[ ${MOCK_LS_FAIL:-0} == 1 ]]; then printf 'FAIL-SECRET-SENTINEL\n'; exit 17; fi
-    if [[ ${MOCK_PATH_CONTROL:-0} == 1 ]]; then
+    if [[ ${MOCK_MANY:-0} == 1 ]]; then
+      for i in $(seq -w 1 40); do printf 'entry-%s\n' "$i"; done
+    elif [[ ${MOCK_PATH_CONTROL:-0} == 1 ]]; then
       printf 'example/login\033]0;PWNED-PATH\007\nsecond/entry\n'
     elif [[ ${MOCK_PATH_SPACES:-0} == 1 ]]; then
       printf 'dir with spaces/login entry\nsecond/entry\n'
@@ -61,6 +63,7 @@ case "$1" in
       [[ $tty_mode =~ (^|[[:space:]])icanon([[:space:]]|$) ]] && printf 'icanon=1\n' || printf 'icanon=0\n'
       [[ $tty_mode =~ (^|[[:space:]])echo([[:space:]]|$) ]] && printf 'echo=1\n' || printf 'echo=0\n'
     } >>"$NPASS_TTY_LOG"
+    [[ ${MOCK_ACTION_NOISE:-0} == 1 ]] && printf 'NOISE-FROM-CLI\n'
     exit "${MOCK_ACTION_EXIT:-0}"
     ;;
   show)

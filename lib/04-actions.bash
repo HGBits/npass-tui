@@ -23,15 +23,10 @@ run_action() {
             while IFS= read -r line; do OTP_LINES+=("$line"); done <<< "$output"
             output=''
             # The code lives only in OTP_LINES and on the OTP screen, never in the
-            # status line. Any key returns to where the person was.
+            # status line. Any key returns to where the person was (main loop).
             OTP_RETURN=$SCREEN
             SCREEN=otp
-            set_status "OTP de $path"
-            render_current
-            IFS= read -r -s -n 1
-            SCREEN=$OTP_RETURN
-            OTP_LINES=()
-            STATUS='' ;;
+            set_status "OTP de $path" ;;
     esac
 }
 
@@ -46,19 +41,27 @@ open_preview() {
     fi
     PREVIEW_LINES=()
     while IFS= read -r line; do PREVIEW_LINES+=("$line"); done <<< "$content"
+    content=''
     SCREEN=preview
     PREVIEW_OFFSET=0
-    render_preview
+}
+
+# One-line prompt on the status row, in the terminal's normal (cooked) mode.
+# The answer is left in REPLY; the next frame repaints everything (raw_mode).
+prompt_line() {
+    local label=$1 input
+    cooked_mode
+    cup "$STATUS_ROW" 0
+    OUT+=$EL$label
+    flush
+    IFS= read -r input || input=''
+    raw_mode
+    REPLY=$input
 }
 
 search_prompt() {
-    local input
-    cooked_mode
-    tput cup $((ROWS - 2)) 0
-    printf '%s' 'Filtro (vazio remove): '
-    IFS= read -r input || input=''
-    raw_mode
-    QUERY=$input
+    prompt_line 'Filtro (vazio remove): '
+    QUERY=$REPLY
     rebuild_visible
     set_status "Filtro aplicado: ${QUERY:-nenhum}"
 }
@@ -66,7 +69,7 @@ search_prompt() {
 confirm_delete() {
     local path=$1 answer safe_identity safe_path
     cooked_mode
-    tput clear 2>/dev/null || true
+    printf '%s' "$CLEAR"
     # Identity and path originate outside the TUI; never print them raw to the terminal.
     safe_identity=$(sanitize_text "$CURRENT_ID")
     safe_path=$(sanitize_text "$path")
@@ -85,12 +88,8 @@ confirm_delete() {
 
 prompt_path() {
     local input
-    cooked_mode
-    tput cup $((ROWS - 2)) 0
-    clear_line $((ROWS - 2))
-    printf '%s' 'Caminho da nova entrada (vazio cancela): '
-    IFS= read -r input || input=''
-    raw_mode
+    prompt_line 'Caminho da nova entrada (vazio cancela): '
+    input=$REPLY
     if [[ -z $input ]]; then
         set_status 'Criação cancelada.'
         return 1

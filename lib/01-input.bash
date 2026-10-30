@@ -4,6 +4,8 @@ read_key() {
     local key seq rc
     # Poll with a timeout so pending signal traps run even while the user is idle.
     while :; do
+        # SIGWINCH only sets WINCH; the main loop re-reads the size.
+        if (( WINCH )); then WINCH=0; REPLY=resize; return; fi
         if IFS= read -r -s -n 1 -t 0.2 key; then
             break
         else

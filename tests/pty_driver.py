@@ -265,7 +265,7 @@ def sc_path_spaces(s):
     s.read_until("dir with spaces/login entry")
     s.send("c")
     s.wait_text("Comando npass clip concluído.", FOOT_ENTRIES)
-    # Successful clip uses show_message(), which consumes one dismissal key.
+    # The status message lasts until the next key; an unknown key just clears it.
     s.send("x")
     wait_entries(s)
     quit_tui(s)
@@ -418,10 +418,8 @@ def sc_control_output(s):
         raise Fail("untrusted CLI control sequence reached the terminal")
     s.send("q")
     wait_entries(s)
-    if s.screen.has("safe-line"):
+    if s.screen.has("safe-line") or s.screen.has("still-safe"):
         raise Fail("preview content stayed on screen after leaving the preview")
-    if not s.raw_has("\x1b[H\x1b[2J", after=content_end):
-        raise Fail("preview screen was not cleared when leaving it")
     quit_tui(s)
 
 
@@ -533,7 +531,146 @@ def sc_status_transient(s):
     quit_tui(s)
 
 
+import re  # noqa: E402
+
+CUP_RE = re.compile(rb"\x1b\[\d+;\d+H")
+CLEAR_SEQ = b"\x1b[H\x1b[2J"
+
+
+def selected_rows(screen):
+    """Linhas do corpo (entre as duas réguas) desenhadas em vídeo reverso."""
+    return [r for r in range(3, screen.rows - 3) if "rev" in screen.attrs_at(r, 0)]
+
+
+def sent_since(s, mark):
+    s.settle(0.1)
+    return bytes(s.output[mark:])
+
+
+def at_entries_many(s):
+    open_identity(s)
+    wait_entries(s)
+    s.wait_text("entry-01", "entry-18")
+
+
+def sc_render_nav(s):
+    at_entries_many(s)
+    need(selected_rows(s.screen) == [3], "seleção inicial fora da primeira linha")
+    m = s.mark()
+    s.send("j")
+    s.wait_screen(lambda sc: selected_rows(sc) == [4], "seleção desceu uma linha")
+    chunk = sent_since(s, m)
+    need(CLEAR_SEQ not in chunk, "a tela foi limpa ao mover a seleção")
+    need(len(CUP_RE.findall(chunk)) <= 2,
+         "mover a seleção sem rolar deveria redesenhar 2 linhas: %r" % chunk)
+    for stale in (b"npass-tui", b"Navegar", b"Entradas", b"Esc Voltar"):
+        need(stale not in chunk, "região que não mudou foi redesenhada: %r" % stale)
+    need(len(chunk) < 400, "atualização grande demais para mover a seleção: %d bytes" % len(chunk))
+    m = s.mark()
+    s.send("k")
+    s.wait_screen(lambda sc: selected_rows(sc) == [3], "seleção subiu uma linha")
+    chunk = sent_since(s, m)
+    need(CLEAR_SEQ not in chunk and len(CUP_RE.findall(chunk)) <= 2, "subir redesenhou demais")
+    need(not s.screen.scrolled and not s.screen.overflow, "tela rolou ou passou da coluna")
+    quit_tui(s)
+
+
+def sc_render_scroll(s):
+    at_entries_many(s)
+    body_last = s.rows - 4
+    for _ in range(17):
+        s.send("j")
+    s.wait_screen(lambda sc: selected_rows(sc) == [body_last], "cursor na última linha visível")
+    need(s.screen.has("entry-01"), "rolou antes da hora")
+    m = s.mark()
+    s.send("j")
+    s.wait_screen(lambda sc: sc.has("entry-19") and not sc.has("entry-01 "), "lista rolou uma linha")
+    need(selected_rows(s.screen) == [body_last], "seleção deveria ficar na última linha visível")
+    chunk = sent_since(s, m)
+    need(CLEAR_SEQ not in chunk, "a tela foi limpa ao rolar")
+    for stale in (b"npass-tui", b"Navegar", b"Esc Voltar", b"Entradas"):
+        need(stale not in chunk, "header/footer redesenhados ao rolar: %r" % stale)
+    need(b"entry-19" in chunk, "a linha nova não foi desenhada")
+    need(len(CUP_RE.findall(chunk)) <= s.rows - 6, "rolagem redesenhou mais que a lista")
+    for _ in range(17):
+        s.send("k")
+    s.wait_screen(lambda sc: sc.has("entry-02") and selected_rows(sc) == [3], "voltou ao topo da janela")
+    need(not s.screen.scrolled and not s.screen.overflow, "tela rolou ou passou da coluna")
+    quit_tui(s)
+
+
+def sc_render_resize(s):
+    at_entries_many(s)
+    for rows, cols in ((30, 80), (12, 50), (40, 120)):
+        m = s.mark()
+        s.resize(rows, cols)
+        s.wait_screen(lambda sc: "Esc Voltar" in sc.line(rows - 1) or "Voltar" in sc.line(rows - 1),
+                      "rodapé na última linha de %dx%d" % (cols, rows))
+        s.settle(0.1)
+        need(CLEAR_SEQ in bytes(s.output[m:]), "redimensionar deveria repintar do zero")
+        need(s.screen.line(0).startswith(" npass-tui"), "cabeçalho ausente em %dx%d" % (cols, rows))
+        need(not s.screen.overflow and not s.screen.scrolled,
+             "texto passou da coluna ou a tela rolou em %dx%d" % (cols, rows))
+        need(selected_rows(s.screen) == [3], "seleção perdida depois de redimensionar")
+    quit_tui(s)
+
+
+def sc_render_too_small(s):
+    s.wait_text("Terminal pequeno demais")
+    for key in "deao\rcj/":
+        s.send(key)
+    s.settle(0.2)
+    need(s.screen.has("Terminal pequeno demais"), "mensagem de terminal pequeno sumiu")
+    need(not s.screen.overflow and not s.screen.scrolled, "tela rolou ou passou da coluna")
+    s.resize(24, 100)
+    wait_identities(s)
+    need(not s.screen.has("Terminal pequeno demais"), "mensagem ficou na tela depois de crescer")
+    s.send("q")
+    check_clean_exit(s, "terminal pequeno")
+
+
+def sc_render_external(s):
+    open_identity(s)
+    wait_entries(s)
+    s.read_until("example/login")
+    m = s.mark()
+    s.send("e")
+    s.wait_text("Edição concluída: example/login", FOOT_ENTRIES, "example/login")
+    need(not s.screen.has("NOISE-FROM-CLI"), "saída do comando externo ficou na tela")
+    need(CLEAR_SEQ in sent_since(s, m), "depois de um comando externo a tela deveria ser repintada")
+    need(s.screen.line(0).startswith(" npass-tui") and selected_rows(s.screen) == [3],
+         "tela não voltou ao normal depois do comando externo")
+    quit_tui(s)
+
+
+def sc_render_attrs(s):
+    open_identity(s)
+    wait_entries(s)
+    s.read_until("second/entry")
+    need("rev" in s.screen.attrs_at(0, 0) and "bold" in s.screen.attrs_at(0, 0), "cabeçalho sem bold+reverse")
+    need(selected_rows(s.screen) == [3], "linha selecionada sem vídeo reverso")
+    s.send("j")
+    s.wait_screen(lambda sc: selected_rows(sc) == [4], "seleção desceu")
+    s.send("\r")
+    s.wait_text("Conteúdo da entrada", "Rolar")
+    s.send("q")
+    wait_entries(s)
+    s.send("o")
+    s.wait_text(SECRET_OTP)
+    s.send("x")
+    wait_entries(s)
+    need(not s.screen.colors, "a TUI impôs cores (SGR %s); deve herdar as do terminal" % sorted(s.screen.colors))
+    need(not s.screen.unknown, "sequências desconhecidas emitidas: %r" % s.screen.unknown)
+    quit_tui(s)
+
+
 SCENARIOS = {
+    "render-nav": sc_render_nav,
+    "render-scroll": sc_render_scroll,
+    "render-resize": sc_render_resize,
+    "render-too-small": sc_render_too_small,
+    "render-external": sc_render_external,
+    "render-attrs": sc_render_attrs,
     "footer-identities": sc_footer_identities,
     "footer-entries": sc_footer_entries,
     "footer-preview": sc_footer_preview,
@@ -579,9 +716,11 @@ def main():
     try:
         SCENARIOS[scenario](s)
         s.settle(0.02)
-        if b"sed: -e expression" in s.output:
-            print("sanitizer emitted a sed expression error", file=sys.stderr)
-            return 1
+        for noise in (b"sed: -e expression", b"command not found", b"unbound variable",
+                      b"bad substitution", b"syntax error"):
+            if noise in s.output:
+                print("a TUI emitiu erro do shell na tela: %s" % noise.decode(), file=sys.stderr)
+                return 1
         return 0
     except Fail as exc:
         print(str(exc), file=sys.stderr)

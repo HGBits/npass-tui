@@ -8,11 +8,19 @@ NPASS_BIN=${NPASS_BIN:-npass}
 main_loop() {
     load_identities || true
     raw_mode
+    render_init
     while :; do
-        render_current
+        render
         read_key
+        if [[ $REPLY == resize ]]; then
+            term_size
+            R_FULL=1
+            continue
+        fi
         # STATUS is a transient message: it lasts until the next key press.
         STATUS=''
+        # Too small to see what a key would do: only leaving is allowed.
+        if (( TOO_SMALL )) && [[ $REPLY != quit ]]; then continue; fi
         case $SCREEN:$REPLY in
             identities:quit) break ;;
             identities:up) (( CURSOR > 0 )) && ((CURSOR--)) ;;
@@ -43,9 +51,10 @@ main_loop() {
                 PREVIEW_LINES=()
                 PREVIEW_OFFSET=0 ;;
             preview:up) (( PREVIEW_OFFSET > 0 )) && ((PREVIEW_OFFSET--)) ;;
-            preview:down) (( PREVIEW_OFFSET + 1 < ${#PREVIEW_LINES[@]} )) && ((PREVIEW_OFFSET++)) ;;
+            preview:down) (( PREVIEW_OFFSET + BODY_H < ${#PREVIEW_LINES[@]} )) && ((PREVIEW_OFFSET++)) ;;
             preview:clip) run_action clip "${VISIBLE[CURSOR]}" ;;
             preview:otp) run_action otp "${VISIBLE[CURSOR]}" ;;
+            otp:*) SCREEN=$OTP_RETURN; OTP_LINES=() ;;
         esac
     done
 }
