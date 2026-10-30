@@ -13,7 +13,8 @@ Este repositório contém uma interface de terminal (TUI) em Bash para o `npass`
 | Auditoria dos contratos da CLI e decisões de integração | `docs/CLI-AUDIT.md` |
 | Plano de funcionalidades pendentes | `IMPLEMENTATION-ROADMAP.md` |
 | Testes de fluxos TUI | `tests/entry-create.bats`, `tests/entry-edit.bats`, `tests/entry-delete.bats` |
-| Driver PTY determinístico | `tests/pty_driver.py` |
+| Driver PTY determinístico | `tests/pty_driver.py` (cenários) e `tests/vt.py` (emulador de terminal: tela, atributos, overflow) |
+| Testes de interface | `tests/footer.bats`, `tests/render.bats`, `tests/layout.bats`, `tests/preview.bats` |
 | Helpers de teste | `tests/test_helper.bash` |
 | CI e validação automática | `.github/workflows/ci.yml` |
 | Documentação de uso | `README.md` |

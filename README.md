@@ -7,7 +7,7 @@ Interface de terminal em **Bash** para o [`npass`](https://github.com/HGBits/npa
 - Bash 4.3+
 - `tput` e `stty` (normalmente fornecidos por ncurses/coreutils/util-linux, conforme a distribuição)
 - `npass-store` **2.8** instalado e configurado conforme a documentação do projeto (versão-alvo; a TUI aborta se a versão for incompatível — `NPASS_TUI_SKIP_VERSION_CHECK=1` ignora a checagem)
-- Terminal interativo com suporte a terminfo
+- Terminal interativo com suporte a terminfo, no mínimo 40 colunas × 10 linhas (abaixo disso a TUI mostra um aviso e só aceita sair)
 
 Não depende de Python, `dialog`, `fzf` ou `gum`.
 
@@ -22,7 +22,7 @@ O binário gerado não procura `lib/` em tempo de execução: pode ser copiado p
 lib/00-core.bash    # estado, traps, modo do terminal, sanitização
 lib/01-input.bash   # teclado → tokens lógicos
 lib/02-backend.bash # contrato com a CLI npass (versão, identidades, caminhos)
-lib/03-render.bash  # telas e renderização
+lib/03-render.bash  # layout, renderização incremental (paint), painéis Explorer/Contexto
 lib/04-actions.bash # ações do usuário (clip, otp, insert, edit, rm, filtro)
 lib/99-main.bash    # checagens de ambiente, loop principal e ponto de entrada (sempre por último)
 build.sh            # lib/*.bash -> bin/npass-tui + bin/npass-tui.asc (assinatura GPG)
@@ -68,13 +68,36 @@ Se `npass` não estiver no `PATH`, informe o caminho:
 NPASS_BIN="$HOME/.local/bin/npass" ./bin/npass-tui
 ```
 
+## Tela
+
+```
+ npass-tui  COFRE / personal
+────────────────────────────────────────┬─────────────────────────────
+ ENTRADAS  3/12                         │ CONTEXTO
+ > example/login                        │ login
+   second/entry                         │ Pasta:       example
+                                        │ Posição:     3 de 12
+────────────────────────────────────────┴─────────────────────────────
+ mensagem transitória (status)
+ ↑↓ Navegar  Enter Abrir  / Filtrar  A Criar  E Editar  D Excluir ...
+```
+
+- **Explorer** (esquerda, ~40%): identidades ou entradas, com posição/total e filtro.
+- **Contexto** (direita): resumo da seleção; no preview, o conteúdo da entrada.
+- **Status**: só mensagens transitórias; some na tecla seguinte.
+- **Atalhos**: só os da tela atual. Em terminal estreito caem primeiro os menos importantes.
+- Com menos de 49 colunas o layout é compacto: um painel por vez.
+- A TUI não define cores: usa bold, dim e reverse e herda o tema do terminal.
+- Locale sem UTF-8, ou `NPASS_TUI_ASCII=1`, troca bordas e símbolos por ASCII. Caracteres de largura dupla (CJK, emoji) em caminhos não têm a largura calculada e podem desalinhar a linha.
+
 ## Controles
 
-- `↑` / `↓` ou `j` / `k`: navegar
-- `Enter`: abrir identidade ou visualizar entrada
+- `↑` / `↓` ou `j` / `k`: navegar (no preview revelado, rolar)
+- `Enter`: abrir identidade; abrir entrada (executa `npass show --raw`, mas o conteúdo abre **oculto**)
+- `v`: revelar/ocultar o conteúdo no preview
 - `/`: filtrar caminhos; filtro vazio mostra tudo
 - `c`: copiar senha via `npass clip`
-- `o`: consultar OTP via `npass otp`
+- `o`: consultar OTP via `npass otp`; qualquer tecla volta
 - `a`: criar entrada, informando o caminho; o próprio `npass insert` solicita a senha duas vezes sem eco e confirma antes de sobrescrever
 - `e`: editar a entrada selecionada com `npass edit` e o editor definido em `$EDITOR`
 - `d`: excluir a entrada selecionada; exige digitar `sim`, avisa sobre anexos de backup e mantém a confirmação nativa do `npass rm`
@@ -84,11 +107,11 @@ NPASS_BIN="$HOME/.local/bin/npass" ./bin/npass-tui
 ## Segurança e escopo
 
 - Identidades são obtidas por `npass identities`; caminhos por `npass ls --flat ID`.
-- O conteúdo é obtido apenas quando solicitado, via `npass show --raw ID CAMINHO`.
+- O conteúdo é obtido apenas com `Enter` numa entrada, via `npass show --raw ID CAMINHO`; navegar, filtrar e o painel de Contexto nunca o leem. O preview abre oculto e só `v` o desenha; ao sair do preview as linhas são descartadas.
 - A TUI não grava segredos em arquivos temporários nem implementa o formato de armazenamento do npass.
 - A TUI delega criação, edição e exclusão à CLI do `npass`; não implementa armazenamento nem parsing de escrita próprio. Movimentação e geração ainda não fazem parte da interface.
-- O conteúdo exibido fica na memória do processo e pode ser capturado por gravação de terminal ou visto por alguém com acesso à tela. Use em uma sessão confiável.
+- O conteúdo decifrado fica na memória do processo enquanto o preview está aberto, mesmo oculto (o bash não permite zerá-la), e pode ser capturado por gravação de terminal ou visto por alguém com acesso à tela. Use em uma sessão confiável.
 
 ## Estado
 
-Versão inicial: navegação por identidades e caminhos, preview com scroll, filtro simples, clipboard e OTP. A implementação ainda precisa ser validada manualmente contra um cofre real em diferentes terminais.
+Navegação por identidades e caminhos em Split View com renderização incremental, preview protegido com scroll, filtro simples, clipboard e OTP. A implementação ainda precisa ser validada manualmente contra um cofre real em diferentes terminais.

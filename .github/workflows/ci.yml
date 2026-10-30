@@ -21,7 +21,7 @@ jobs:
           bash -n build.sh
           bash -n bin/npass-tui
           bash -n tests/test_helper.bash
-          python3 -m py_compile tests/pty_driver.py
+          python3 -m py_compile tests/pty_driver.py tests/vt.py
       - name: Validate Bats test files
         run: bats --count tests/*.bats
       - name: Run Bats tests

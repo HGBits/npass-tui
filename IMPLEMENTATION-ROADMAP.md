@@ -54,7 +54,7 @@ Use mocks/fixtures isolados, nunca o cofre pessoal. Inclua os testes novos no CI
 
 - [ ] **Completar a cobertura com mock da CLI e pseudo-terminal (PTY).** O driver determinístico cobre criação/edição/exclusão, cancelamento, retorno não zero, saída maliciosa com sequências OSC/CSI tanto no preview quanto em caminhos listados, restauração após `SIGINT`, `SIGTERM`, `SIGHUP` e saída normal, e após falha de comando interativo, entrega do modo normal do terminal à CLI e retorno ao modo TUI. Testes também verificam que falhas de listagem, preview, clipboard e OTP não imprimem a saída arbitrária da CLI no status; o OTP de fixture não aparece no log de argumentos nem no status, e a tela de preview é limpa ao sair. Ainda falta ampliar a cobertura de fluxos sensíveis e falhas da CLI, além de validar a integração manual com terminal e cofre de teste.
 - [ ] **Validar a integração real com terminal e cofre de teste.** Testar manualmente `insert`, `edit`, preview, clipboard e OTP em pelo menos um terminal compatível; não usar o cofre pessoal como fixture.
-- [ ] **Revisar limpeza visual de segredos.** Ao sair do preview ou após exibir OTP, limpar/redesenhar a tela quando apropriado e evitar manter conteúdo secreto em status ou mensagens duradouras.
+- [x] **Revisar limpeza visual de segredos.** O preview abre oculto (só `v` desenha o conteúdo), sair do preview descarta as linhas e sobrescreve o painel, o OTP vive numa tela própria e some na tecla seguinte, e nenhum segredo vai para o status. Cobertos por `tests/preview.bats` e `tests/footer.bats`. Pendente: o bash não zera a memória do processo.
 - [ ] **Tratar nomes/caminhos e saída inesperada da CLI de forma robusta.** Não depender de parsing frágil da saída humana; validar nomes e falhas sem esconder erros de descriptografia.
 - [x] **Confirmar contrato de listagem da CLI.** A TUI usa `npass ls --flat ID`, conforme o contrato atual documentado em npass-store, em vez do comando legado `tree`.
 
@@ -64,7 +64,7 @@ Use mocks/fixtures isolados, nunca o cofre pessoal. Inclua os testes novos no CI
 - [ ] **Gerar senha (`npass generate`).** Oferecer escolha explícita entre criar/substituir entrada e atualizar só a senha preservando campos, OTP e notas (`--in-place`, quando suportado). Exibir claramente o destino e respeitar a confirmação da CLI. Criar testes comportamentais para sucesso, cancelamento, destino existente e falhas da CLI.
 - [ ] **Renomear/mover entrada (`npass mv`).** Fluxo dedicado para caminho de origem e destino, validação de destino e confirmação. Distinguir movimento dentro da mesma identidade de movimento entre identidades, que recifra para os destinatários de destino. Testar ambos os tipos de movimento, cancelamento e falhas.
 - [ ] **Criar identidade (`npass init`).** Formulário para ID e destinatários GPG, com validação e confirmação; não misturar administração de identidades com navegação cotidiana. Testar entradas inválidas, cancelamento e erro da CLI.
-- [ ] **Melhorar seleção e navegação de caminhos.** Navegação de diretórios, retorno consistente entre telas, estados vazios e preservação do filtro/posição quando fizer sentido. Testar teclado e transições de estado via PTY.
+- [ ] **Melhorar seleção e navegação de caminhos.** Feito: retorno consistente entre telas (identidade e entrada selecionadas são restauradas), estados vazios, filtro e posição preservados após preview/edição. Falta navegação por diretórios (a lista continua plana).
 
 ### P2 — Busca e recursos de autenticação
 
@@ -115,3 +115,13 @@ A lista é um plano de trabalho, não uma afirmação de que todos os comandos d
 - Código dividido em `lib/` e montado e assinado (GPG) por `build.sh` em `bin/npass-tui` (arquivo único, como o npass-store; ver README); sem `install.sh`; suíte atual: 7 arquivos Bats, 37 testes + `tests/pty_driver.py`.
 - Concluído: sanitização na confirmação de exclusão, filtro de identidades, estabilização de `edit-fail`, estado vazio de entradas/identidades, checagem de versão do `npass` (2.x ≥ 2.8), CI em `main` e `master`.
 - Próximo: `npass generate`, depois `npass mv`.
+
+## Interface (Split View e renderização)
+
+- [x] Separar status de atalhos; rodapé contextual por tela, com prioridade em terminal estreito (`tests/footer.bats`).
+- [x] Renderização incremental: `paint()` só envia ao terminal o que mudou; sem `tput clear` por tecla e sem fork no caminho normal (`tests/render.bats`).
+- [x] Split View Explorer/Contexto, modo compacto abaixo de 49 colunas, aviso abaixo de 40x10, fallback ASCII (`tests/layout.bats`).
+- [x] Contexto da identidade e da entrada sem ler conteúdo secreto; preview protegido (`tests/preview.bats`).
+- [ ] Largura real de caracteres de largura dupla (CJK/emoji) em caminhos; hoje só há contagem por caractere.
+- [ ] Rolagem horizontal ou quebra de linhas longas no preview (hoje terminam em reticências).
+- [ ] Validar manualmente em terminais reais (foot, kitty, alacritty, tty do Linux) o piscar, o redimensionamento e o fallback ASCII; os testes usam um emulador mínimo.
