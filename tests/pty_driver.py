@@ -4,6 +4,12 @@
 Uses Python's standard-library PTY support instead of timing-dependent pipelines
 through util-linux script(1). Every interaction waits for the prompt it expects,
 and the whole child process has a hard timeout.
+
+A minimal terminal emulator (tests/vt.py) keeps the *screen* the user would see,
+so scenarios can assert on rendered text and attributes and not only on bytes.
+
+usage: pty_driver.py SCENARIO TUI_PATH
+env:   PTY_ROWS, PTY_COLS  terminal size (default 24x100)
 """
 import fcntl
 import os
@@ -16,352 +22,468 @@ import sys
 import termios
 import time
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from vt import Screen  # noqa: E402
+
+SECRET_OTP = "OTP-SENTINEL-123456"
+FAIL_SENTINEL = "FAIL-SECRET-SENTINEL"
+
+
+class Fail(Exception):
+    """Falha de asserção do cenário (mensagem vai para stderr, status 1)."""
+
+
+class Session:
+    def __init__(self, tui_path, rows, cols, timeout=10):
+        self.rows, self.cols = rows, cols
+        self.master, slave = pty.openpty()
+        self.set_size(rows, cols, slave)
+        self.original_tty = termios.tcgetattr(slave)
+        env = os.environ.copy()
+        env["TERM"] = "xterm"
+        env.pop("LINES", None)
+        env.pop("COLUMNS", None)
+        self.proc = subprocess.Popen(
+            ["bash", tui_path],
+            stdin=slave, stdout=slave, stderr=slave,
+            env=env, close_fds=True, start_new_session=True,
+        )
+        os.close(slave)
+        self.output = bytearray()
+        self.screen = Screen(rows, cols)
+        self.deadline = time.monotonic() + timeout
+
+    # ---- terminal ---------------------------------------------------------
+    def set_size(self, rows, cols, fd=None):
+        fcntl.ioctl(self.master if fd is None else fd, termios.TIOCSWINSZ,
+                    struct.pack("HHHH", rows, cols, 0, 0))
+
+    def resize(self, rows, cols):
+        """Muda o tamanho do pty e avisa a TUI (sem terminal de controle, o
+        kernel não entrega SIGWINCH sozinho)."""
+        self.set_size(rows, cols)
+        self.rows, self.cols = rows, cols
+        self.screen.resize(rows, cols)
+        os.kill(self.proc.pid, signal.SIGWINCH)
+
+    def tty_attrs(self):
+        return termios.tcgetattr(self.master)
+
+    # ---- E/S ---------------------------------------------------------------
+    def send(self, data):
+        os.write(self.master, data.encode("utf-8"))
+
+    def pump(self, timeout):
+        """Lê o que houver (até `timeout`) e alimenta o emulador. False = EOF."""
+        ready, _, _ = select.select([self.master], [], [], max(0.0, timeout))
+        if not ready:
+            return True
+        try:
+            chunk = os.read(self.master, 65536)
+        except OSError:
+            chunk = b""
+        if not chunk:
+            return False
+        self.output.extend(chunk)
+        self.screen.feed(bytes(chunk))
+        return True
+
+    def mark(self):
+        """Posição atual na saída bruta, para raw_has/read_until(after=...)."""
+        return len(self.output)
+
+    def read_until(self, marker, timeout=3, after=0):
+        end = min(time.monotonic() + timeout, self.deadline)
+        needle = marker.encode("utf-8")
+        while self.output.find(needle, after) < 0:
+            remaining = end - time.monotonic()
+            if remaining <= 0:
+                raise TimeoutError("timed out waiting for prompt: " + marker)
+            if not self.pump(remaining):
+                break
+        position = self.output.find(needle, after)
+        if position < 0:
+            raise TimeoutError("child exited before prompt: " + marker)
+        return position + len(needle)
+
+    def wait_screen(self, predicate, what, timeout=3):
+        end = min(time.monotonic() + timeout, self.deadline)
+        while not predicate(self.screen):
+            remaining = end - time.monotonic()
+            if remaining <= 0:
+                raise TimeoutError("timed out waiting for screen: " + what)
+            if not self.pump(remaining):
+                if predicate(self.screen):
+                    break
+                raise TimeoutError("child exited before screen: " + what)
+
+    def wait_text(self, *needles, timeout=3):
+        self.wait_screen(lambda s: all(s.has(n) for n in needles),
+                         " + ".join(needles), timeout)
+
+    def settle(self, quiet=0.05):
+        """Esgota a saída pendente (para asserções após uma saída)."""
+        while select.select([self.master], [], [], quiet)[0]:
+            if not self.pump(0):
+                break
+
+    def wait_exit(self):
+        remaining = max(0.1, self.deadline - time.monotonic())
+        return self.proc.wait(timeout=remaining)
+
+    def raw_has(self, text, after=0):
+        return self.output.find(text.encode("utf-8"), after) >= 0
+
+    def close(self):
+        os.close(self.master)
+        if self.proc.poll() is None:
+            self.proc.kill()
+            self.proc.wait()
+
+
+def flag_enabled(attrs, flag):
+    return bool(attrs[3] & flag)
+
+
+def cc_value(attrs, index):
+    value = attrs[6][index]
+    return value[0] if isinstance(value, bytes) else int(value)
+
+
+# ---------------------------------------------------------------------------
+# Marcadores da UI. Ficam num só lugar: quando a tela muda, muda aqui.
+# ---------------------------------------------------------------------------
+IDENTITIES_TITLE = "Escolha uma identidade"
+FOOTER_MARK = "Esc voltar"
+
+
+def wait_identities(s):
+    s.wait_text(IDENTITIES_TITLE, FOOTER_MARK)
+
+
+def wait_entries(s):
+    s.wait_text("Entradas", FOOTER_MARK)
+
+
+def quit_tui(s):
+    """q nas entradas volta às identidades; q nas identidades sai."""
+    s.send("q")
+    wait_identities(s)
+    s.send("q")
+    code = s.wait_exit()
+    if code != 0:
+        raise Fail("TUI exited with status %d" % code)
+
+
+def check_clean_exit(s, what):
+    code = s.wait_exit()
+    if code != 0 or s.tty_attrs() != s.original_tty:
+        raise Fail("%s did not exit cleanly and restore the terminal" % what)
+
+
+def start(s):
+    s.read_until("personal")
+
+
+def open_identity(s):
+    start(s)
+    s.send("\r")
+
+
+# ---------------------------------------------------------------------------
+# Cenários
+# ---------------------------------------------------------------------------
+def sc_identities_empty(s):
+    s.wait_text(IDENTITIES_TITLE)
+    s.wait_text("Nenhuma identidade encontrada.", FOOTER_MARK)
+    if s.raw_has("Nenhuma identidade em /tmp/npass-test-store."):
+        raise Fail("CLI empty-store message was rendered as an identity")
+    s.send("q")
+    check_clean_exit(s, "empty identity list")
+
+
+def sc_identities_fail(s):
+    s.wait_text("Erro ao listar identidades (código 17)", FOOTER_MARK)
+    if s.raw_has(FAIL_SENTINEL):
+        raise Fail("identity-list failure output leaked into the terminal")
+    s.send("q")
+    check_clean_exit(s, "identity-list failure")
+
+
+def sc_signal(signal_number, expected_code, name):
+    def run(s):
+        start(s)
+        # Wait for a complete frame so cleanup is tested while idle in read_key().
+        s.wait_text(FOOTER_MARK)
+        os.kill(s.proc.pid, signal_number)
+        code = s.wait_exit()
+        s.settle()
+        if code != expected_code:
+            raise Fail("expected exit status %d after %s, got %d" % (expected_code, name, code))
+        if s.tty_attrs() != s.original_tty:
+            raise Fail("terminal attributes were not restored after %s" % name)
+        if not s.raw_has("\x1b[?25h"):
+            raise Fail("cursor-show sequence missing after %s" % name)
+    return run
+
+
+def sc_exit_cleanup(s):
+    start(s)
+    s.wait_text(FOOTER_MARK)
+    s.send("q")
+    code = s.wait_exit()
+    s.settle()
+    if code != 0:
+        raise Fail("expected exit status 0 after normal exit, got %d" % code)
+    if s.tty_attrs() != s.original_tty:
+        raise Fail("terminal attributes were not restored after normal exit")
+    if not s.raw_has("\x1b[?25h"):
+        raise Fail("cursor-show sequence missing after normal exit")
+
+
+def sc_ls_fail(s):
+    open_identity(s)
+    s.wait_text("Erro ao listar entradas (código 17)", FOOTER_MARK)
+    if s.raw_has(FAIL_SENTINEL):
+        raise Fail("path-list failure output leaked into the terminal")
+    quit_tui(s)
+
+
+def sc_path_control(s):
+    open_identity(s)
+    s.read_until("example/login")
+    s.wait_text(FOOTER_MARK)
+    if s.raw_has("PWNED-PATH") or s.raw_has("\x1b]0;PWNED-PATH\x07"):
+        raise Fail("untrusted path control sequence reached the terminal")
+    quit_tui(s)
+
+
+def sc_path_spaces(s):
+    open_identity(s)
+    s.read_until("dir with spaces/login entry")
+    s.send("c")
+    s.wait_text("Comando npass clip concluído.", FOOTER_MARK)
+    # Successful clip uses show_message(), which consumes one dismissal key.
+    s.send("x")
+    wait_entries(s)
+    quit_tui(s)
+
+
+def sc_create(s):
+    open_identity(s)
+    s.read_until("example/login")
+    s.send("a")
+    s.read_until("Caminho da nova entrada")
+    s.send("new/site\n")
+    s.wait_text("Entrada enviada ao npass", FOOTER_MARK)
+    quit_tui(s)
+
+
+def sc_cancel(s):
+    open_identity(s)
+    s.read_until("example/login")
+    s.send("a")
+    s.read_until("Caminho da nova entrada")
+    s.send("\n")
+    s.wait_text("Criação cancelada.", FOOTER_MARK)
+    quit_tui(s)
+
+
+def sc_edit(s):
+    open_identity(s)
+    s.read_until("example/login")
+    s.send("e")
+    s.wait_text("Edição concluída", FOOTER_MARK)
+    quit_tui(s)
+
+
+def sc_edit_fail(s):
+    open_identity(s)
+    s.read_until("example/login")
+    s.send("e")
+    s.wait_text("npass edit falhou (código 17)", FOOTER_MARK)
+    tui_tty = s.tty_attrs()
+    # TUI raw_mode() relies on these modes, not on every platform-
+    # specific termios flag or control character.
+    if flag_enabled(tui_tty, termios.ICANON) or flag_enabled(tui_tty, termios.ECHO):
+        raise Fail("TUI did not return to non-canonical, no-echo mode after CLI failure")
+    if cc_value(tui_tty, termios.VMIN) != 1 or cc_value(tui_tty, termios.VTIME) != 0:
+        raise Fail("TUI did not restore raw-mode VMIN/VTIME after CLI failure")
+    tty_log = os.environ.get("NPASS_TTY_LOG")
+    if not tty_log or not os.path.exists(tty_log):
+        raise Fail("interactive CLI terminal-mode log is missing")
+    with open(tty_log, "r", encoding="utf-8") as stream:
+        cli_modes = set(stream.read().splitlines())
+    expected = {
+        "icanon=%d" % int(flag_enabled(s.original_tty, termios.ICANON)),
+        "echo=%d" % int(flag_enabled(s.original_tty, termios.ECHO)),
+    }
+    if not expected.issubset(cli_modes):
+        raise Fail("interactive CLI did not receive the original canonical/echo modes")
+    quit_tui(s)
+
+
+def sc_delete(s):
+    open_identity(s)
+    s.read_until("example/login")
+    s.send("d")
+    s.read_until('Digite exatamente "sim"')
+    s.send("sim\n")
+    s.wait_text("Comando npass rm concluído", FOOTER_MARK)
+    quit_tui(s)
+
+
+def sc_delete_cancel(s):
+    open_identity(s)
+    s.read_until("example/login")
+    s.send("d")
+    s.read_until('Digite exatamente "sim"')
+    s.send("nao\n")
+    s.wait_text("Exclusão cancelada.", FOOTER_MARK)
+    quit_tui(s)
+
+
+def sc_delete_control(s):
+    open_identity(s)
+    s.read_until("example/login")
+    s.send("d")
+    s.read_until('Digite exatamente "sim"')
+    if s.raw_has("PWNED-PATH") or s.raw_has("PWNED-IDENTITY"):
+        raise Fail("untrusted identity/path control sequence reached delete confirmation")
+    s.send("nao\n")
+    s.wait_text("Exclusão cancelada.", FOOTER_MARK)
+    quit_tui(s)
+
+
+def sc_show_fail_secret(s):
+    open_identity(s)
+    s.read_until("example/login")
+    s.send("\r")
+    s.wait_text("Erro ao abrir entrada (código 17)")
+    if s.raw_has(FAIL_SENTINEL):
+        raise Fail("preview failure output leaked into the terminal")
+    s.send("x")
+    wait_entries(s)
+    quit_tui(s)
+
+
+def sc_clip_fail_secret(s):
+    open_identity(s)
+    s.read_until("example/login")
+    s.send("c")
+    s.wait_text("Falha ao copiar (código 17)")
+    if s.raw_has(FAIL_SENTINEL):
+        raise Fail("clipboard failure output leaked into the terminal")
+    s.send("x")
+    wait_entries(s)
+    quit_tui(s)
+
+
+def sc_otp_fail_secret(s):
+    open_identity(s)
+    s.read_until("example/login")
+    s.send("o")
+    s.wait_text("Falha ao obter OTP (código 17)")
+    if s.raw_has(FAIL_SENTINEL) or s.raw_has(SECRET_OTP):
+        raise Fail("OTP failure output leaked into the terminal")
+    s.send("x")
+    wait_entries(s)
+    quit_tui(s)
+
+
+def sc_otp_secret(s):
+    open_identity(s)
+    s.read_until("example/login")
+    s.send("o")
+    s.wait_text(SECRET_OTP, "OTP de example/login")
+    status_row = next(r for r in range(s.rows) if "OTP de example/login" in s.screen.line(r))
+    if SECRET_OTP in s.screen.line(status_row):
+        raise Fail("OTP value appeared in the TUI status text")
+    s.send("q")
+    wait_entries(s)
+    if s.screen.has(SECRET_OTP):
+        raise Fail("OTP value stayed on screen after leaving the OTP view")
+    quit_tui(s)
+
+
+def sc_control_output(s):
+    open_identity(s)
+    s.read_until("example/login")
+    s.send("\r")
+    s.read_until("Conteúdo da entrada")
+    content_end = s.read_until("safe-line")
+    if s.raw_has("PWNED-TITLE") or s.raw_has("\x1b[?9999h"):
+        raise Fail("untrusted CLI control sequence reached the terminal")
+    s.send("q")
+    wait_entries(s)
+    if s.screen.has("safe-line"):
+        raise Fail("preview content stayed on screen after leaving the preview")
+    if not s.raw_has("\x1b[H\x1b[2J", after=content_end):
+        raise Fail("preview screen was not cleared when leaving it")
+    quit_tui(s)
+
+
+SCENARIOS = {
+    "identities-empty": sc_identities_empty,
+    "identities-fail": sc_identities_fail,
+    "signal-term": sc_signal(signal.SIGTERM, 143, "SIGTERM"),
+    "signal-int": sc_signal(signal.SIGINT, 130, "SIGINT"),
+    "signal-hup": sc_signal(signal.SIGHUP, 129, "SIGHUP"),
+    "exit-cleanup": sc_exit_cleanup,
+    "ls-fail": sc_ls_fail,
+    "path-control": sc_path_control,
+    "path-spaces": sc_path_spaces,
+    "create": sc_create,
+    "cancel": sc_cancel,
+    "edit": sc_edit,
+    "edit-fail": sc_edit_fail,
+    "delete": sc_delete,
+    "delete-cancel": sc_delete_cancel,
+    "delete-control": sc_delete_control,
+    "show-fail-secret": sc_show_fail_secret,
+    "clip-fail-secret": sc_clip_fail_secret,
+    "otp-fail-secret": sc_otp_fail_secret,
+    "otp-secret": sc_otp_secret,
+    "control-output": sc_control_output,
+}
+
 
 def main():
     if len(sys.argv) != 3:
         print("usage: pty_driver.py SCENARIO TUI_PATH", file=sys.stderr)
         return 2
-
     scenario, tui_path = sys.argv[1:]
-    master, slave = pty.openpty()
-    fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 24, 100, 0, 0))
-    original_tty = termios.tcgetattr(slave)
-    env = os.environ.copy()
-    env["TERM"] = "xterm"
-    proc = subprocess.Popen(
-        ["bash", tui_path],
-        stdin=slave,
-        stdout=slave,
-        stderr=slave,
-        env=env,
-        close_fds=True,
-        start_new_session=True,
-    )
-    os.close(slave)
-    output = bytearray()
-    deadline = time.monotonic() + 10
-
-    def read_until(marker, timeout=3, after=0):
-        end = min(time.monotonic() + timeout, deadline)
-        needle = marker.encode("utf-8")
-        while output.find(needle, after) < 0:
-            remaining = end - time.monotonic()
-            if remaining <= 0:
-                raise TimeoutError("timed out waiting for prompt: " + marker)
-            ready, _, _ = select.select([master], [], [], remaining)
-            if not ready:
-                continue
-            try:
-                chunk = os.read(master, 8192)
-            except OSError:
-                chunk = b""
-            if not chunk:
-                break
-            output.extend(chunk)
-        position = output.find(needle, after)
-        if position < 0:
-            raise TimeoutError("child exited before prompt: " + marker)
-        return position + len(needle)
-
-    def send(data):
-        os.write(master, data.encode("utf-8"))
-
-    def flag_enabled(attrs, flag):
-        return bool(attrs[3] & flag)
-
-    def cc_value(attrs, index):
-        value = attrs[6][index]
-        return value[0] if isinstance(value, bytes) else int(value)
-
+    if scenario not in SCENARIOS:
+        print("PTY test driver: unknown scenario: " + scenario, file=sys.stderr)
+        return 2
+    rows = int(os.environ.get("PTY_ROWS", "24"))
+    cols = int(os.environ.get("PTY_COLS", "100"))
+    s = Session(tui_path, rows, cols)
     try:
-        if scenario == "identities-empty":
-            identity_title_end = read_until("Escolha uma identidade")
-            read_until("Esc voltar", after=identity_title_end)
-            if b"Nenhuma identidade encontrada." not in output:
-                print("empty identity list status message missing", file=sys.stderr)
-                return 1
-            if b"Nenhuma identidade em /tmp/npass-test-store." in output:
-                print("CLI empty-store message was rendered as an identity", file=sys.stderr)
-                return 1
-            send("q")
-            return_code = proc.wait(timeout=max(0.1, deadline - time.monotonic()))
-            if return_code != 0 or termios.tcgetattr(master) != original_tty:
-                print("empty identity list did not exit cleanly and restore the terminal", file=sys.stderr)
-                return 1
-            return 0
-
-        if scenario == "identities-fail":
-            identity_error_end = read_until("Erro ao listar identidades (código 17)")
-            read_until("Esc voltar", after=identity_error_end)
-            if b"FAIL-SECRET-SENTINEL" in output:
-                print("identity-list failure output leaked into the terminal", file=sys.stderr)
-                return 1
-            send("q")
-            return_code = proc.wait(timeout=max(0.1, deadline - time.monotonic()))
-            if return_code != 0 or termios.tcgetattr(master) != original_tty:
-                print("identity-list failure did not exit cleanly and restore the terminal", file=sys.stderr)
-                return 1
-            return 0
-
-        read_until("personal")
-
-        signal_scenarios = {
-            "signal-term": (signal.SIGTERM, 143, "SIGTERM"),
-            "signal-int": (signal.SIGINT, 130, "SIGINT"),
-            "signal-hup": (signal.SIGHUP, 129, "SIGHUP"),
-        }
-        if scenario in signal_scenarios or scenario == "exit-cleanup":
-            # Wait for a complete frame so cleanup is tested while idle in read_key().
-            read_until("Esc voltar")
-            if scenario == "exit-cleanup":
-                send("q")
-                return_code = proc.wait(timeout=max(0.1, deadline - time.monotonic()))
-                expected_code = 0
-                signal_name = "normal exit"
-            else:
-                signal_number, expected_code, signal_name = signal_scenarios[scenario]
-                os.kill(proc.pid, signal_number)
-                return_code = proc.wait(timeout=max(0.1, deadline - time.monotonic()))
-            # Drain cleanup output before asserting cursor restoration.
-            while select.select([master], [], [], 0.05)[0]:
-                try:
-                    chunk = os.read(master, 8192)
-                except OSError:
-                    break
-                if not chunk:
-                    break
-                output.extend(chunk)
-            restored_tty = termios.tcgetattr(master)
-            if return_code != expected_code:
-                print(f"expected exit status {expected_code} after {signal_name}, got {return_code}", file=sys.stderr)
-                return 1
-            if restored_tty != original_tty:
-                print(f"terminal attributes were not restored after {signal_name}", file=sys.stderr)
-                return 1
-            if b"\x1b[?25h" not in output:
-                print(f"cursor-show sequence missing after {signal_name}", file=sys.stderr)
-                return 1
-            return 0
-
-        send("\r")
-        if scenario == "ls-fail":
-            path_error_end = read_until("Erro ao listar entradas (código 17)")
-            read_until("Esc voltar", after=path_error_end)
-            if b"FAIL-SECRET-SENTINEL" in output:
-                print("path-list failure output leaked into the terminal", file=sys.stderr)
-                return 1
-            send("q")
-            before_identity = len(output)
-            identity_end = read_until("Escolha uma identidade", after=before_identity)
-            read_until("Esc voltar", after=identity_end)
-            send("q")
-            return_code = proc.wait(timeout=max(0.1, deadline - time.monotonic()))
-            if return_code != 0:
-                print("TUI did not exit after path-list failure", file=sys.stderr)
-                return 1
-            return 0
-        if scenario == "path-spaces":
-            read_until("dir with spaces/login entry")
-        else:
-            read_until("example/login")
-        if scenario == "path-control":
-            read_until("Esc voltar")
-            if b"PWNED-PATH" in output or b"\x1b]0;PWNED-PATH\x07" in output:
-                print("untrusted path control sequence reached the terminal", file=sys.stderr)
-                return 1
-            send("q")
-            before_identity = len(output)
-            identity_end = read_until("Escolha uma identidade", after=before_identity)
-            read_until("Esc voltar", after=identity_end)
-            send("q")
-            return_code = proc.wait(timeout=max(0.1, deadline - time.monotonic()))
-            if return_code != 0:
-                print("TUI did not exit after path-control scenario", file=sys.stderr)
-                return 1
-            return 0
-
-        if scenario == "path-spaces":
-            send("c")
-            read_until("Comando npass clip concluído.")
-        elif scenario == "create":
-            send("a")
-            read_until("Caminho da nova entrada")
-            send("new/site\n")
-            read_until("Entrada enviada ao npass")
-        elif scenario == "cancel":
-            send("a")
-            read_until("Caminho da nova entrada")
-            send("\n")
-            read_until("Criação cancelada.")
-        elif scenario == "edit":
-            send("e")
-            read_until("Edição concluída")
-        elif scenario == "edit-fail":
-            send("e")
-            read_until("npass edit falhou (código 17)")
-        elif scenario == "delete":
-            send("d")
-            read_until('Digite exatamente "sim"')
-            send("sim\n")
-            read_until("Comando npass rm concluído")
-        elif scenario == "delete-cancel":
-            send("d")
-            read_until('Digite exatamente "sim"')
-            send("nao\n")
-            read_until("Exclusão cancelada.")
-        elif scenario == "delete-control":
-            send("d")
-            read_until('Digite exatamente "sim"')
-            if b"PWNED-PATH" in output or b"PWNED-IDENTITY" in output:
-                print("untrusted identity/path control sequence reached delete confirmation", file=sys.stderr)
-                return 1
-            send("nao\n")
-            read_until("Exclusão cancelada.")
-        elif scenario == "show-fail-secret":
-            send("\r")
-            read_until("Erro ao abrir entrada (código 17)")
-            if b"FAIL-SECRET-SENTINEL" in output:
-                print("preview failure output leaked into the terminal", file=sys.stderr)
-                return 1
-            send("x")
-            before_entries = len(output)
-            entries_end = read_until("Entradas", after=before_entries)
-            read_until("Esc voltar", after=entries_end)
-        elif scenario == "clip-fail-secret":
-            send("c")
-            read_until("Falha ao copiar (código 17)")
-            if b"FAIL-SECRET-SENTINEL" in output:
-                print("clipboard failure output leaked into the terminal", file=sys.stderr)
-                return 1
-            send("x")
-            before_entries = len(output)
-            entries_end = read_until("Entradas", after=before_entries)
-            read_until("Esc voltar", after=entries_end)
-        elif scenario == "otp-fail-secret":
-            send("o")
-            read_until("Falha ao obter OTP (código 17)")
-            if b"FAIL-SECRET-SENTINEL" in output or b"OTP-SENTINEL-123456" in output:
-                print("OTP failure output leaked into the terminal", file=sys.stderr)
-                return 1
-            send("x")
-            before_entries = len(output)
-            entries_end = read_until("Entradas", after=before_entries)
-            read_until("Esc voltar", after=entries_end)
-        elif scenario == "otp-secret":
-            send("o")
-            secret = b"OTP-SENTINEL-123456"
-            secret_end = read_until(secret.decode("ascii"))
-            status_marker = b"OTP de example/login"
-            read_until(status_marker.decode("ascii"), after=secret_end)
-            status_start = output.rfind(status_marker)
-            if output.find(secret, status_start) >= 0:
-                print("OTP value appeared in the TUI status text", file=sys.stderr)
-                return 1
-            send("q")
-            before_entries = len(output)
-            entries_end = read_until("Entradas", after=before_entries)
-            read_until("Esc voltar", after=entries_end)
-        elif scenario == "control-output":
-            send("\r")
-            read_until("Conteúdo da entrada")
-            preview_content_end = read_until("safe-line")
-            if b"PWNED-TITLE" in output or b"\x1b[?9999h" in output:
-                print("untrusted CLI control sequence reached the terminal", file=sys.stderr)
-                return 1
-            send("q")
-            before_entries = len(output)
-            entries_end = read_until("Entradas", after=before_entries)
-            if b"\x1b[H\x1b[2J" not in output[preview_content_end:entries_end]:
-                print("preview screen was not cleared when leaving it", file=sys.stderr)
-                return 1
-            read_until("Esc voltar", after=entries_end)
-        else:
-            raise ValueError("unknown scenario: " + scenario)
-
-        # The status text is printed before the footer; wait for the footer
-        # after that status before sending q, so the key cannot race the render.
-        status_marker = {
-            "create": "Entrada enviada ao npass",
-            "cancel": "Criação cancelada.",
-            "edit": "Edição concluída",
-            "edit-fail": "npass edit falhou (código 17)",
-            "otp-secret": "Entradas",
-            "show-fail-secret": "Entradas",
-            "clip-fail-secret": "Entradas",
-            "otp-fail-secret": "Entradas",
-            "delete": "Comando npass rm concluído",
-            "delete-cancel": "Exclusão cancelada.",
-            "delete-control": "Exclusão cancelada.",
-            "control-output": "Entradas",
-            "path-spaces": "Comando npass clip concluído.",
-        }[scenario]
-        status_end = output.rfind(status_marker.encode("utf-8"))
-        read_until("Esc voltar", after=status_end + len(status_marker.encode("utf-8")))
-        if scenario == "path-spaces":
-            # Successful clip uses show_message(), which consumes one dismissal key.
-            send("x")
-            read_until("Esc voltar", after=len(output))
-        if scenario == "edit-fail":
-            tui_tty = termios.tcgetattr(master)
-            # TUI raw_mode() relies on these modes, not on every platform-
-            # specific termios flag or control character.
-            if flag_enabled(tui_tty, termios.ICANON) or flag_enabled(tui_tty, termios.ECHO):
-                print("TUI did not return to non-canonical, no-echo mode after CLI failure", file=sys.stderr)
-                return 1
-            if cc_value(tui_tty, termios.VMIN) != 1 or cc_value(tui_tty, termios.VTIME) != 0:
-                print("TUI did not restore raw-mode VMIN/VTIME after CLI failure", file=sys.stderr)
-                return 1
-
-            tty_log = os.environ.get("NPASS_TTY_LOG")
-            if not tty_log or not os.path.exists(tty_log):
-                print("interactive CLI terminal-mode log is missing", file=sys.stderr)
-                return 1
-            with open(tty_log, "r", encoding="utf-8") as stream:
-                cli_modes = set(stream.read().splitlines())
-            expected_cli_modes = {
-                f"icanon={int(flag_enabled(original_tty, termios.ICANON))}",
-                f"echo={int(flag_enabled(original_tty, termios.ECHO))}",
-            }
-            if not expected_cli_modes.issubset(cli_modes):
-                print(
-                    "interactive CLI did not receive the original canonical/echo modes",
-                    file=sys.stderr,
-                )
-                return 1
-        # In the entries screen, q returns to the identity list; it does not
-        # exit the application. Send q once to go back, then once more to exit.
-        before_back = len(output)
-        send("q")
-        identity_title_end = read_until("Escolha uma identidade", after=before_back)
-        read_until("Esc voltar", after=identity_title_end)
-        send("q")
-        remaining = max(0, deadline - time.monotonic())
-        try:
-            return_code = proc.wait(timeout=remaining)
-        except subprocess.TimeoutExpired:
-            raise TimeoutError("TUI did not exit after receiving q")
-        if return_code != 0:
-            print("TUI exited with status", return_code, file=sys.stderr)
-            return 1
-        if b"sed: -e expression" in output:
+        SCENARIOS[scenario](s)
+        s.settle(0.02)
+        if b"sed: -e expression" in s.output:
             print("sanitizer emitted a sed expression error", file=sys.stderr)
             return 1
         return 0
-    except (TimeoutError, ValueError, OSError) as exc:
+    except Fail as exc:
+        print(str(exc), file=sys.stderr)
+        sys.stderr.write("--- tela ---\n" + s.screen.text() + "\n")
+        return 1
+    except (TimeoutError, ValueError, OSError, subprocess.TimeoutExpired) as exc:
         print("PTY test driver:", exc, file=sys.stderr)
         try:
-            proc.kill()
-            proc.wait(timeout=1)
+            s.proc.kill()
+            s.proc.wait(timeout=1)
         except Exception:
             pass
-        # Escape sequences are useful when diagnosing terminal rendering.
-        sys.stderr.write(output.decode("utf-8", errors="replace"))
+        s.settle(0.02)
+        # Tela final e saída bruta ajudam a diagnosticar a renderização.
+        sys.stderr.write("--- tela ---\n" + s.screen.text() + "\n--- bruto ---\n")
+        sys.stderr.write(s.output.decode("utf-8", errors="replace"))
         return 1
     finally:
-        os.close(master)
-        if proc.poll() is None:
-            proc.kill()
-            proc.wait()
+        s.close()
 
 
 if __name__ == "__main__":
