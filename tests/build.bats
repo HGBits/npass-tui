@@ -30,25 +30,16 @@ load test_helper
   grep -qx 'bin/' "$ROOT/.gitignore"
 }
 
-@test "install.sh instala o arquivo único e o binário instalado roda sem o repositório" {
-  local prefix="$TMP/prefix"
-  run env PREFIX="$prefix" bash "$ROOT/install.sh"
-  [ "$status" -eq 0 ]
-  [ -x "$prefix/bin/npass-tui" ]
-  [ "$(stat -c %a "$prefix/bin/npass-tui")" = "755" ]
-  [ ! -e "$prefix/share/npass-tui" ]
-  # sem terminal interativo, chega até a checagem de TTY (prova que o arquivo é autocontido)
-  run env NPASS_BIN="$MOCK_NPASS" "$prefix/bin/npass-tui" </dev/null
-  [ "$status" -eq 1 ]
-  [[ $output == *"execute em um terminal interativo"* ]]
+@test "install.sh não existe mais" {
+  [ ! -e "$ROOT/install.sh" ]
 }
 
-@test "install.sh --uninstall remove o binário" {
-  local prefix="$TMP/prefix"
-  env PREFIX="$prefix" bash "$ROOT/install.sh" >/dev/null
-  run env PREFIX="$prefix" bash "$ROOT/install.sh" --uninstall
-  [ "$status" -eq 0 ]
-  [ ! -e "$prefix/bin/npass-tui" ]
+@test "binário gerado roda copiado para fora do repositório" {
+  bash "$ROOT/build.sh" --no-sign >/dev/null
+  install -Dm755 "$TUI" "$TMP/dest/bin/npass-tui"
+  run env NPASS_BIN="$MOCK_NPASS" "$TMP/dest/bin/npass-tui" </dev/null
+  [ "$status" -eq 1 ]
+  [[ $output == *"execute em um terminal interativo"* ]]
 }
 
 # Chave GPG descartável, num GNUPGHOME próprio: nunca toca o chaveiro real.

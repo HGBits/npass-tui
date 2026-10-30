@@ -19,7 +19,6 @@ jobs:
       - name: Check Bash syntax
         run: |
           bash -n build.sh
-          bash -n install.sh
           bash -n bin/npass-tui
           bash -n tests/test_helper.bash
           python3 -m py_compile tests/pty_driver.py
