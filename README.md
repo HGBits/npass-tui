@@ -1,6 +1,6 @@
 # npass-tui
 
-Interface de terminal em **Bash** para o [`npass`](https://github.com/HGBits/npass). A TUI é uma camada de apresentação: armazenamento, criptografia, descriptografia, clipboard e OTP continuam sendo responsabilidade do `npass`.
+Interface de terminal em **Bash** para o [`npass`](https://github.com/HGBits/npass-store). A TUI é uma camada de apresentação: armazenamento, criptografia, descriptografia, clipboard e OTP continuam sendo responsabilidade do `npass`.
 
 ## Requisitos
 
