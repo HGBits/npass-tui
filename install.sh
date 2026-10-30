@@ -52,7 +52,7 @@ if [[ -z "$DESTDIR" && $EUID -ne 0 ]]; then
 fi
 
 echo "Reconstruindo bin/npass-tui a partir de lib/*.bash..."
-bash build.sh
+bash build.sh --no-sign
 
 old_umask="$(umask)"
 umask 022

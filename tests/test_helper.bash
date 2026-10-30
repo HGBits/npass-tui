@@ -13,7 +13,7 @@ tui_test_build() {
     done
   fi
   (( stale )) || return 0
-  bash "$ROOT/build.sh" >/dev/null
+  bash "$ROOT/build.sh" --no-sign >/dev/null
 }
 
 setup() {
