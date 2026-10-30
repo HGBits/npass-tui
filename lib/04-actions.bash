@@ -44,6 +44,16 @@ open_preview() {
     content=''
     SCREEN=preview
     PREVIEW_OFFSET=0
+    PREVIEW_REVEAL=0
+}
+
+# Drop the decrypted content as soon as the preview is left. (Bash cannot
+# promise the memory is wiped; this only stops the TUI from holding on to it.)
+close_preview() {
+    SCREEN=entries
+    PREVIEW_LINES=()
+    PREVIEW_OFFSET=0
+    PREVIEW_REVEAL=0
 }
 
 # One-line prompt on the status row, in the terminal's normal (cooked) mode.
@@ -98,7 +108,8 @@ prompt_path() {
 }
 
 run_interactive_npass() {
-    local action=$1 path=$2 rc
+    local action=$1 path=$2 rc keep=${VISIBLE[CURSOR]-} idx=$CURSOR
+    [[ $action == insert ]] && keep=$path
     # npass insert prompts for the secret twice; npass edit launches $EDITOR.
     # Both need the user's normal terminal settings and the real terminal streams.
     cooked_mode
@@ -118,5 +129,5 @@ run_interactive_npass() {
     else
         set_status "npass $action falhou (código $rc): $path"
     fi
-    load_paths || true
+    if load_paths; then restore_selection "$keep" "$idx"; fi
 }

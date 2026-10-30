@@ -31,6 +31,7 @@ PATHS=()
 VISIBLE=()
 PREVIEW_LINES=()
 PREVIEW_OFFSET=0
+PREVIEW_REVEAL=0     # 1 only after an explicit V; the content is never drawn while 0
 OTP_LINES=()
 OTP_RETURN=entries
 ROWS=24

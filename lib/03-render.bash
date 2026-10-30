@@ -121,7 +121,12 @@ footer_keys() {
         identities) items=("1|$G_UPDN|Navegar" '1|Enter|Abrir' '1|Q|Sair') ;;
         entries) items=("1|$G_UPDN|Navegar" '1|Enter|Abrir' '2|/|Filtrar' '3|A|Criar' '3|E|Editar'
                         '3|D|Excluir' '2|C|Copiar' '2|O|OTP' '1|Esc|Voltar') ;;
-        preview) items=("1|$G_UPDN|Rolar" '2|C|Copiar' '2|O|OTP' '1|Esc|Voltar') ;;
+        preview)
+            if (( PREVIEW_REVEAL )); then
+                items=('1|V|Ocultar' "2|$G_UPDN|Rolar" '2|C|Copiar' '2|O|OTP' '1|Esc|Voltar')
+            else
+                items=('1|V|Revelar' '2|C|Copiar' '2|O|OTP' '1|Esc|Voltar')
+            fi ;;
         otp) items=('1|Qualquer tecla|Voltar') ;;
     esac
     while :; do
@@ -318,8 +323,15 @@ render() {
             fi ;;
         preview | otp)
             (( SPLIT )) && draw_explorer
-            if [[ $SCREEN == preview ]]; then
-                draw_text 'CONTEÚDO' PREVIEW_LINES "$PREVIEW_OFFSET"
+            if [[ $SCREEN == preview && $PREVIEW_REVEAL == 1 ]]; then
+                draw_text 'CONTEÚDO  [revelado]' PREVIEW_LINES "$PREVIEW_OFFSET"
+            elif [[ $SCREEN == preview ]]; then
+                # Hidden: not a single line of the content is drawn.
+                CTX=() CTX_A=()
+                ctx_add 'Conteúdo protegido.' "$BOLD"
+                ctx_add ''
+                ctx_add 'Pressione V para revelar.'
+                draw_context 'CONTEÚDO  [oculto]'
             else
                 draw_text 'CÓDIGO OTP' OTP_LINES 0
             fi ;;

@@ -72,7 +72,9 @@ case "$1" in
     ;;
   show)
     if [[ ${MOCK_SHOW_FAIL:-0} == 1 ]]; then printf 'FAIL-SECRET-SENTINEL\n'; exit 17; fi
-    if [[ ${MOCK_SHOW_CONTROL:-0} == 1 ]]; then
+    if [[ ${MOCK_SHOW_LONG:-0} == 1 ]]; then
+      for i in $(seq -w 1 60); do printf 'line-%s\n' "$i"; done
+    elif [[ ${MOCK_SHOW_CONTROL:-0} == 1 ]]; then
       printf 'safe-line\033]0;PWNED-TITLE\007\033[?9999hstill-safe\n'
     else
       printf '<!-- npass:md1 -->\n## Senha\nnot-a-real-secret\n'

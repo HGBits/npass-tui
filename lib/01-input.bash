@@ -38,6 +38,7 @@ read_key() {
         d|D) REPLY=delete ;;
         c|C) REPLY=clip ;;
         o|O) REPLY=otp ;;
+        v|V) REPLY=reveal ;;
         /) REPLY=search ;;
         *) REPLY=unknown ;;
     esac

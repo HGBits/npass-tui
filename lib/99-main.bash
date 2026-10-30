@@ -49,12 +49,11 @@ main_loop() {
             entries:enter) if (( ${#VISIBLE[@]} > 0 )); then open_preview "${VISIBLE[CURSOR]}"; fi ;;
             entries:clip) if (( ${#VISIBLE[@]} > 0 )); then run_action clip "${VISIBLE[CURSOR]}"; fi ;;
             entries:otp) if (( ${#VISIBLE[@]} > 0 )); then run_action otp "${VISIBLE[CURSOR]}"; fi ;;
-            preview:quit|preview:back)
-                SCREEN=entries
-                PREVIEW_LINES=()
-                PREVIEW_OFFSET=0 ;;
-            preview:up) (( PREVIEW_OFFSET > 0 )) && ((PREVIEW_OFFSET--)) ;;
-            preview:down) (( PREVIEW_OFFSET + BODY_H < ${#PREVIEW_LINES[@]} )) && ((PREVIEW_OFFSET++)) ;;
+            preview:quit|preview:back) close_preview ;;
+            preview:reveal)
+                if (( PREVIEW_REVEAL )); then PREVIEW_REVEAL=0 PREVIEW_OFFSET=0; else PREVIEW_REVEAL=1; fi ;;
+            preview:up) (( PREVIEW_REVEAL && PREVIEW_OFFSET > 0 )) && ((PREVIEW_OFFSET--)) ;;
+            preview:down) (( PREVIEW_REVEAL && PREVIEW_OFFSET + BODY_H < ${#PREVIEW_LINES[@]} )) && ((PREVIEW_OFFSET++)) ;;
             preview:clip) run_action clip "${VISIBLE[CURSOR]}" ;;
             preview:otp) run_action otp "${VISIBLE[CURSOR]}" ;;
             otp:*) SCREEN=$OTP_RETURN; OTP_LINES=() ;;

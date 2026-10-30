@@ -84,3 +84,15 @@ rebuild_visible() {
     CURSOR=0
     OFFSET=0
 }
+
+# After the list is reloaded (edit, insert, rm) put the selection back on the
+# same path; if it is gone, stay near the old position.
+restore_selection() {
+    local want=$1 idx=$2 i
+    for i in "${!VISIBLE[@]}"; do
+        if [[ ${VISIBLE[i]} == "$want" ]]; then CURSOR=$i; return 0; fi
+    done
+    CURSOR=$idx
+    (( CURSOR < ${#VISIBLE[@]} )) || CURSOR=$((${#VISIBLE[@]} - 1))
+    (( CURSOR >= 0 )) || CURSOR=0
+}

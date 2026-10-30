@@ -413,7 +413,8 @@ def sc_control_output(s):
     s.read_until("example/login")
     s.send("\r")
     s.read_until("CONTEÚDO")
-    content_end = s.read_until("safe-line")
+    s.send("v")
+    s.read_until("safe-line")
     if s.raw_has("PWNED-TITLE") or s.raw_has("\x1b[?9999h"):
         raise Fail("untrusted CLI control sequence reached the terminal")
     s.send("q")
@@ -470,12 +471,15 @@ def sc_footer_preview(s):
     open_identity(s)
     wait_entries(s)
     s.send("\r")
-    s.wait_text("CONTEÚDO", "Rolar")
+    s.wait_text("CONTEÚDO", "V Revelar")
     foot = last_row(s)
     need("Esc Voltar" in foot and "C Copiar" in foot, "rodapé do preview incompleto: %r" % foot)
+    need("Rolar" not in foot, "rolagem não se aplica com o conteúdo oculto")
     for key in ("Filtrar", "Criar", "Excluir", "Navegar"):
         need(key not in foot, "rodapé do preview mostra atalho inaplicável %r" % key)
-    need(count(s, "Rolar") == 1, "atalhos duplicados na tela")
+    s.send("v")
+    s.wait_text("V Ocultar", "Rolar")
+    need(count(s, "Rolar") == 1 and count(s, "Ocultar") == 1, "atalhos duplicados na tela")
     s.send("q")
     wait_entries(s)
     quit_tui(s)
@@ -653,7 +657,7 @@ def sc_render_attrs(s):
     s.send("j")
     s.wait_screen(lambda sc: selected_rows(sc) == [4], "seleção desceu")
     s.send("\r")
-    s.wait_text("CONTEÚDO", "Rolar")
+    s.wait_text("CONTEÚDO", "V Revelar")
     s.send("q")
     wait_entries(s)
     s.send("o")
@@ -695,7 +699,7 @@ def sc_layout_compact(s):
     s.send("\r")
     s.wait_text("ENTRADAS", "example/login")
     s.send("\r")
-    s.wait_text("CONTEÚDO", "Rolar")
+    s.wait_text("CONTEÚDO", "V Revelar")
     need("ENTRADAS" not in s.screen.text(), "no preview compacto o Contexto ocupa a largura toda")
     need(s.screen.line(2).startswith(" CONTEÚDO"), "título do preview deveria começar na coluna 0")
     s.send("q")
@@ -771,7 +775,135 @@ def sc_context_entry(s):
     quit_tui(s)
 
 
+SAFE = "safe-line"
+
+
+def sc_preview_protected(s):
+    at_entries_many(s)
+    s.send("\r")
+    s.wait_text("CONTEÚDO  [oculto]", "Conteúdo protegido.", "Pressione V para revelar.")
+    s.settle(0.2)
+    need(not s.raw_has(SAFE) and not s.raw_has("still-safe"), "conteúdo desenhado antes de revelar")
+    need(not s.screen.has(SAFE), "conteúdo na tela antes de revelar")
+    s.send("j")
+    s.send("k")
+    s.settle(0.1)
+    need(not s.raw_has(SAFE), "rolar com o conteúdo oculto revelou algo")
+    s.send("v")
+    s.wait_text("CONTEÚDO  [revelado]", SAFE)
+    s.send("v")
+    s.wait_screen(lambda sc: not sc.has(SAFE) and sc.has("[oculto]"), "conteúdo oculto de novo")
+    s.send("v")
+    s.wait_text(SAFE)
+    s.send("q")
+    s.wait_text("ENTRADAS", "Enter Abrir", "CONTEXTO")
+    need(not s.screen.has(SAFE) and not s.screen.has("still-safe"), "conteúdo ficou na tela ao sair")
+    s.send("\r")
+    s.wait_text("[oculto]")
+    need(not s.screen.has(SAFE), "reabrir deveria começar oculto de novo")
+    s.send("q")
+    s.wait_text("ENTRADAS", "Enter Abrir", "CONTEXTO")
+    quit_tui(s)
+
+
+def sc_preview_scroll(s):
+    open_identity(s)
+    wait_entries(s)
+    s.send("\r")
+    s.wait_text("[oculto]")
+    s.send("j")
+    s.send("v")
+    s.wait_text("line-01", "line-18")
+    need(not s.screen.has("line-19"), "janela do preview maior que o painel")
+    for _ in range(5):
+        s.send("j")
+    s.wait_text("line-06", "line-23")
+    need(not s.screen.has("line-01 "), "linha antiga ficou depois de rolar")
+    for _ in range(80):
+        s.send("j")
+    s.wait_text("line-60")
+    s.settle(0.1)
+    need(s.screen.has("line-43") and not s.screen.has("line-42 "), "rolagem não parou no fim")
+    s.send("k")
+    s.wait_text("line-42")
+    s.send("v")
+    s.wait_text("[oculto]")
+    s.send("v")
+    s.wait_text("line-01", "line-18")
+    need(not s.screen.scrolled and not s.screen.overflow, "tela rolou ou passou da coluna")
+    s.send("q")
+    wait_entries(s)
+    quit_tui(s)
+
+
+def sc_preview_otp_return(s):
+    open_identity(s)
+    wait_entries(s)
+    s.send("\r")
+    s.wait_text("[oculto]")
+    s.send("v")
+    s.wait_text(SAFE)
+    s.send("o")
+    s.wait_text("CÓDIGO OTP", SECRET_OTP)
+    need(not s.screen.has(SAFE), "conteúdo e OTP misturados na mesma tela")
+    s.send("x")
+    s.wait_text("CONTEÚDO  [revelado]", SAFE)
+    need(not s.screen.has(SECRET_OTP), "OTP ficou na tela ao voltar")
+    s.send("q")
+    wait_entries(s)
+    quit_tui(s)
+
+
+def sc_preview_keeps_selection(s):
+    open_identity(s)
+    wait_entries(s)
+    s.send("j")
+    s.wait_screen(lambda sc: selected_rows(sc) == [4], "segunda entrada selecionada")
+    s.send("\r")
+    s.wait_text("[oculto]")
+    need("second/entry" in s.screen.line(0), "preview da entrada errada")
+    need("bold" in s.screen.attrs_at(4, 0) and "rev" not in s.screen.attrs_at(4, 0),
+         "com o foco no preview a seleção do Explorer deveria ser só bold")
+    s.send("q")
+    wait_entries(s)
+    need(selected_rows(s.screen) == [4], "voltar do preview perdeu a seleção")
+    s.send("e")
+    s.wait_text("Edição concluída: second/entry", FOOT_ENTRIES)
+    need(selected_rows(s.screen) == [4], "editar perdeu a seleção")
+    quit_tui(s)
+
+
+def sc_filter(s):
+    open_identity(s)
+    s.wait_text("example/login", "second/entry")
+    s.send("/")
+    s.read_until("Filtro (vazio remove)")
+    s.send("second\n")
+    s.wait_text("Filtro aplicado: second", "filtro: second", "1/1")
+    need(not s.screen.has("example/login"), "entrada fora do filtro continua visível")
+    s.send("q")
+    s.wait_text("IDENTIDADES")
+    s.send("\r")
+    s.wait_text("example/login", "second/entry")
+    need("filtro" not in s.screen.line(2), "filtro deveria ser limpo ao reabrir a identidade")
+    s.send("/")
+    s.read_until("Filtro (vazio remove)", after=s.mark())
+    s.send("zzz\n")
+    s.wait_text("Nenhuma entrada corresponde ao filtro")
+    s.send("/")
+    s.read_until("Filtro (vazio remove)", after=s.mark())
+    s.send("\n")
+    s.wait_text("example/login", "second/entry")
+    need("filtro" not in s.screen.line(2), "filtro vazio deveria remover o filtro")
+    quit_tui(s)
+
+
 SCENARIOS = {
+    "preview-protected": sc_preview_protected,
+    "preview-scroll": sc_preview_scroll,
+    "preview-otp-return": sc_preview_otp_return,
+    "preview-keeps-selection": sc_preview_keeps_selection,
+    "filter": sc_filter,
     "layout-split": sc_layout_split,
     "layout-compact": sc_layout_compact,
     "layout-boundary": sc_layout_boundary,
