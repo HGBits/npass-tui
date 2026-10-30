@@ -14,7 +14,8 @@ Não depende de Python, `dialog`, `fzf` ou `gum`.
 ## Estrutura
 
 O código-fonte fica em `lib/*.bash`. `build.sh` concatena os arquivos, em ordem, no
-executável único `bin/npass-tui` (no `.gitignore`), do mesmo modo que o npass-store gera `bin/npass`.
+executável único `bin/npass-tui` (no `.gitignore`), do mesmo modo que o npass-store gera `bin/npass`,
+e assina o resultado com GPG (`bin/npass-tui.asc`).
 O binário gerado não procura `lib/` em tempo de execução: pode ser copiado para qualquer lugar.
 
 ```
@@ -24,22 +25,40 @@ lib/02-backend.bash # contrato com a CLI npass (versão, identidades, caminhos)
 lib/03-render.bash  # telas e renderização
 lib/04-actions.bash # ações do usuário (clip, otp, insert, edit, rm, filtro)
 lib/99-main.bash    # checagens de ambiente, loop principal e ponto de entrada (sempre por último)
-build.sh            # lib/*.bash -> bin/npass-tui
-install.sh          # reconstrói e instala bin/npass-tui
+build.sh            # lib/*.bash -> bin/npass-tui + bin/npass-tui.asc (assinatura GPG)
+```
+
+Não há `install.sh`: o build gera e assina o binário, e instalar é copiá-lo.
+
+## Build e assinatura
+
+```sh
+./build.sh                # gera e assina com a chave padrão
+./build.sh --key=ID       # assina com a chave ID (fingerprint ou e-mail)
+./build.sh --no-sign      # só gera o binário (testes, CI)
+```
+
+Chave usada, em ordem: `--key`, `NPASS_TUI_SIGN_KEY`, `git config user.signingkey`, chave secreta padrão do gpg.
+O build verifica a própria assinatura e falha, sem deixar `.asc`, se não conseguir assinar. Verificar:
+
+```sh
+gpg --verify bin/npass-tui.asc bin/npass-tui
 ```
 
 ## Instalar
 
 ```sh
-sudo ./install.sh                    # /usr/bin/npass-tui
-./install.sh --prefix="$HOME/.local" # só para o seu usuário
-./install.sh --uninstall
+./build.sh
+sudo install -Dm755 bin/npass-tui /usr/bin/npass-tui                # global
+install -Dm755 bin/npass-tui "$HOME/.local/bin/npass-tui"           # só para o seu usuário
 ```
+
+Remover: apague o arquivo instalado (`sudo rm /usr/bin/npass-tui` ou `rm ~/.local/bin/npass-tui`).
 
 ## Executar sem instalar
 
 ```sh
-./build.sh
+./build.sh --no-sign
 ./bin/npass-tui
 ```
 

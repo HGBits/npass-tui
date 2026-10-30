@@ -112,6 +112,6 @@ A lista é um plano de trabalho, não uma afirmação de que todos os comandos d
 
 ## Atualização 2026-10-29
 
-- Código dividido em `lib/` e montado por `build.sh` em `bin/npass-tui` (arquivo único, como o npass-store; ver README); suíte atual: 6 arquivos Bats, 31 testes + `tests/pty_driver.py`.
+- Código dividido em `lib/` e montado e assinado (GPG) por `build.sh` em `bin/npass-tui` (arquivo único, como o npass-store; ver README); sem `install.sh`; suíte atual: 7 arquivos Bats, 37 testes + `tests/pty_driver.py`.
 - Concluído: sanitização na confirmação de exclusão, filtro de identidades, estabilização de `edit-fail`, estado vazio de entradas/identidades, checagem de versão do `npass` (2.x ≥ 2.8), CI em `main` e `master`.
 - Próximo: `npass generate`, depois `npass mv`.
