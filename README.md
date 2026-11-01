@@ -26,7 +26,6 @@ lib/03-render.bash  # layout, renderização incremental (paint), painéis Explo
 lib/04-actions.bash # ações do usuário (clip, otp, insert, edit, rm, filtro)
 lib/99-main.bash    # checagens de ambiente, loop principal e ponto de entrada (sempre por último)
 release.sh          # lógica de build e assinatura GPG
-build.sh            # alias de compatibilidade para release.sh
 ```
 
 Não há `install.sh`: o build gera e assina o binário, e instalar é copiá-lo.
@@ -39,7 +38,7 @@ Não há `install.sh`: o build gera e assina o binário, e instalar é copiá-lo
 ./release.sh --no-sign      # só gera o binário (testes, CI)
 ```
 
-Chave usada, em ordem: `--key`, `NPASS_TUI_SIGN_KEY`, `git config user.signingkey`, chave secreta padrão do gpg. `build.sh` permanece apenas como alias de compatibilidade; a implementação fica em `release.sh`.
+Chave usada, em ordem: `--key`, `NPASS_TUI_SIGN_KEY`, `git config user.signingkey`, chave secreta padrão do gpg.
 O build verifica a própria assinatura e falha, sem deixar `.asc`, se não conseguir assinar. Verificar:
 
 ```sh
