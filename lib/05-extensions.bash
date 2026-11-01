@@ -37,7 +37,7 @@ declare -A EXT_USE=(
     [audit]='Enter audita a identidade selecionada.'
     [import]='Enter importa um arquivo para a identidade selecionada.'
     [passkey]='Sem ação na TUI. Use na CLI: npass passkey.'
-    [clip-x11]='Usada pelo menu Copiar em sessões X11, sem ação aqui.'
+    [clip-x11]='Enter copia a senha ou um campo da entrada selecionada via xclip (X11).'
     [wclip]='Usada pelo menu Copiar com NPASS_TUI_CLIP=wclip, sem ação aqui.'
 )
 
@@ -170,6 +170,48 @@ ext_audit() {
     if (( rc == 0 )); then set_status "Auditoria de $id concluída."; else set_status "npass audit falhou (código $rc)."; fi
 }
 
+# Copy through the explicit clip-x11 extension action. The entry content
+# never enters the TUI: stdout/stderr are captured and discarded, and only the
+# exit status is reported. The extension itself owns xclip and clipboard cleanup.
+ext_clip_x11() {
+    local id=$1 path field label output rc
+    if [[ $EXT_RETURN != entries ]]; then
+        set_status 'Abra uma entrada antes de usar clip-x11.'
+        return
+    fi
+    path=${VISIBLE[CURSOR]-}
+    if [[ -z $path ]]; then
+        set_status 'Nenhuma entrada selecionada.'
+        return
+    fi
+    if ! session_is_x11 || [[ -z ${DISPLAY:-} ]]; then
+        set_status 'clip-x11 requer uma sessão X11 ativa (DISPLAY).'
+        return
+    fi
+    prompt_line 'Campo (vazio = senha, all = documento inteiro): '
+    field=$REPLY
+    if [[ -n $field && ! $field =~ ^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$ ]]; then
+        set_status 'Nome de campo inválido.'
+        return
+    fi
+    label='senha'
+    [[ $field == all ]] && label='documento'
+    [[ -n $field && $field != all ]] && label="campo $field"
+    if [[ -n $field ]]; then
+        output=$("$NPASS_BIN" clip-x11 "$field" "$id" "$path" 2>&1)
+        rc=$?
+    else
+        output=$("$NPASS_BIN" clip-x11 "$id" "$path" 2>&1)
+        rc=$?
+    fi
+    output=''
+    if (( rc == 0 )); then
+        set_status "Copiado via clip-x11: $label de $path."
+    else
+        set_status "clip-x11 falhou (código $rc). Verifique X11, xclip e a extensão."
+    fi
+}
+
 ext_import() {
     local id=$1 format file answer rc
     prompt_line 'Formato (veja: npass import --list): '
@@ -216,6 +258,9 @@ ext_activate() {
         audit | import)
             if [[ -z $id ]]; then set_status 'Nenhuma identidade selecionada.'; return; fi
             "ext_$name" "$id" ;;
+        clip-x11)
+            if [[ -z $id ]]; then set_status 'Nenhuma identidade selecionada.'; return; fi
+            ext_clip_x11 "$id" ;;
         *) set_status "${EXT_USE[$name]:-Sem ação na TUI para $name.}" ;;
     esac
 }
