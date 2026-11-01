@@ -114,3 +114,10 @@ teardown() { gpg_test_cleanup; }
   [ "$status" -ne 0 ]
   [[ $output == *"opção desconhecida"* ]]
 }
+
+@test "release.sh contém a implementação e build.sh só encaminha chamadas antigas" {
+  grep -Fq 'for f in lib/*.bash' "$ROOT/release.sh"
+  grep -Fq 'gpg_args=(--batch --yes --armor --detach-sign' "$ROOT/release.sh"
+  grep -Fq 'exec "$ROOT/release.sh" "$@"' "$ROOT/build.sh"
+  ! grep -Fq 'for f in lib/*.bash' "$ROOT/build.sh"
+}
