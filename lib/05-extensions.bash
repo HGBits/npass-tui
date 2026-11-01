@@ -12,7 +12,7 @@ EXT_INFO=()       # other lines, e.g. the notice that no extension directory exi
 EXT_CURSOR=0
 EXT_LOADED=0
 EXT_RC=0
-CLIP_CMD=clip     # command behind "copy": clip, clip-x11 or wclip
+CLIP_CMD=clip     # command behind "copy": clip, xclip or wclip
 CLIP_NOTE=''      # why, when it is not the default
 
 # Reasons the core gives when it refuses an extension (lib/11-extensions.bash).
@@ -93,22 +93,23 @@ session_is_x11() {
     [[ -z ${WAYLAND_DISPLAY:-} && -n ${DISPLAY:-} ]]
 }
 
-# Chooses what "copy" calls. NPASS_TUI_CLIP=clip|clip-x11|wclip forces it. On an
+# Chooses what "copy" calls. NPASS_TUI_CLIP=clip|xclip|wclip (clip-x11 is accepted as a legacy alias) forces it. On an
 # X11 session the core clip (Wayland) does not work, so clip-x11 is used when
 # the extension is installed; its command line matches `clip`.
 clip_backend() {
     CLIP_CMD=clip CLIP_NOTE=''
     case ${NPASS_TUI_CLIP:-} in
-        clip | clip-x11 | wclip)
+        clip | xclip | clip-x11 | wclip)
             CLIP_CMD=$NPASS_TUI_CLIP
+            [[ $CLIP_CMD == clip-x11 ]] && CLIP_CMD=xclip
             CLIP_NOTE="$CLIP_CMD (NPASS_TUI_CLIP)"
             return ;;
     esac
     session_is_x11 || return 0
     (( EXT_LOADED )) || ext_load || true
     if ext_installed clip-x11; then
-        CLIP_CMD=clip-x11
-        CLIP_NOTE='clip-x11 (sessão X11)'
+        CLIP_CMD=xclip
+        CLIP_NOTE='xclip (sessão X11)'
     elif ext_refused clip-x11; then
         CLIP_NOTE='clip-x11 recusada pelo npass'
     else
