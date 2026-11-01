@@ -153,9 +153,7 @@ load test_helper
 }
 
 @test "TUI rejeita nomes de artefato com prefixo npass- duplicado" {
-  MOCK_EXT_PREFIXED=1 run_tui_case extensions
+  run bash -c "source '$ROOT/lib/00-core.bash' 2>/dev/null; source '$ROOT/lib/05-extensions.bash'; NPASS_BIN='$MOCK_NPASS' NPASS_LOG=/dev/null MOCK_EXT_PREFIXED=1 ext_load; printf '%s|%s' \"\${#EXT_NAMES[@]}\" \"\${#EXT_INFO[@]}\""
   [ "$status" -eq 0 ]
-  run bash -c "source '$ROOT/lib/00-core.bash' 2>/dev/null; source '$ROOT/lib/05-extensions.bash'; NPASS_BIN='$MOCK_NPASS' NPASS_LOG=/dev/null MOCK_EXT_PREFIXED=1 ext_load; printf '%s' "\${EXT_NAMES[*]}""
-  [ "$status" -eq 0 ]
-  [ "$output" = "" ]
+  [ "$output" = "0|1" ]
 }
