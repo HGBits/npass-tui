@@ -32,14 +32,24 @@ Não há `install.sh`: o build gera e assina o binário, e instalar é copiá-lo
 
 ## Build e assinatura
 
+A raiz de confiança é a mesma do `npass-store` e do `npass-extensions`:
+`packaging/npass-release.asc`. O build de release importa essa chave em um
+keyring GPG temporário e isolado e só assina se a chave privada selecionada
+corresponder exatamente ao fingerprint oficial. O keyring pessoal não define
+quais chaves são confiáveis.
+
 ```sh
-./release.sh                # gera e assina com a chave padrão
-./release.sh --key=ID       # assina com a chave ID (fingerprint ou e-mail)
-./release.sh --no-sign      # só gera o binário (testes, CI)
+./release.sh                # gera e assina com a chave oficial
+./release.sh --key=ID       # seleciona a chave privada, que deve ser a oficial
+./release.sh --no-sign      # só gera o binário (testes e desenvolvimento)
 ```
 
-Chave usada, em ordem: `--key`, `NPASS_TUI_SIGN_KEY`, `git config user.signingkey`, chave secreta padrão do gpg.
-O build verifica a própria assinatura e falha, sem deixar `.asc`, se não conseguir assinar. Verificar:
+A chave privada nunca deve ser armazenada no repositório ou no CI. Seleção da
+chave privada, em ordem: `--key`, `NPASS_RELEASE_SIGNING_KEY`,
+`git config user.signingkey` e primeira chave secreta disponível no GPG.
+Uma chave diferente da oficial é rejeitada antes da publicação dos artefatos.
+
+Verificar a assinatura:
 
 ```sh
 gpg --verify bin/npass-tui.asc bin/npass-tui
