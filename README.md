@@ -96,17 +96,25 @@ NPASS_BIN="$HOME/.local/bin/npass" ./bin/npass-tui
 - `Enter`: abrir identidade; abrir entrada (executa `npass show --raw`, mas o conteúdo abre **oculto**)
 - `v`: revelar/ocultar o conteúdo no preview
 - `/`: filtrar caminhos; filtro vazio mostra tudo
-- `c`: menu de cópia; escolha o que vai para a área de transferência (`Enter` copia, `Esc` cancela). O valor nunca passa pela tela:
-  - **Senha** (`npass clip ID CAMINHO`), **Login**, **E-mail**, **PIN** (`npass clip CAMPO ID CAMINHO`)
-  - **Código OTP** (`npass otp clip ID CAMINHO`)
+- `c` (só dentro da entrada, depois de `Enter`): menu de cópia; escolha o que vai para a área de transferência (`Enter` copia, `Esc` cancela). O valor nunca passa pela tela:
+  - **Senha**, **Login**, **E-mail**, **PIN**, **Outro campo...** e **Documento inteiro** usam `npass clip [CAMPO] ID CAMINHO` (ou o backend abaixo)
+  - **Código OTP** usa `npass otp clip ID CAMINHO`
   - **Outro campo...** pergunta o nome (letras, números, `_`, `.`, `-`; sem `-` no início)
-  - **Documento inteiro** (`npass clip all ID CAMINHO`)
-- `x`: Extensões; lista somente leitura de `npass extension list`. Ações sobre extensões ainda não existem; a tela é o ponto de encaixe para elas
+- `x`: Extensões instaladas (`npass extension list`), com descrição. `Enter` executa as que têm ação na TUI:
+  - **audit**: pergunta `s` (HIBP online) ou `o` (offline) e roda `npass audit ID [--offline]`
+  - **import**: pergunta formato e arquivo, pede `sim` e roda `npass import FORMATO ID ARQUIVO`; depois recarrega a lista
+  - **passkey**, **clip-x11**, **wclip**: sem ação aqui (passkey pela CLI; os clips são usados pelo menu Copiar)
 - `a`: criar entrada, informando o caminho; o próprio `npass insert` solicita a senha duas vezes sem eco e confirma antes de sobrescrever
 - `e`: editar a entrada selecionada com `npass edit` e o editor definido em `$EDITOR`
 - `d`: excluir a entrada selecionada; exige digitar `sim`, avisa sobre anexos de backup e mantém a confirmação nativa do `npass rm`
 - `Esc`: voltar
 - `q`: voltar ou sair
+
+## Clipboard e extensões
+
+O menu Copiar chama `npass clip`, que usa o clipboard Wayland do core. Em **sessão X11** (por exemplo bspwm) o TUI usa a extensão `clip-x11`, que tem a mesma linha de comando, desde que ela esteja instalada; se não estiver, o menu avisa "X11 sem a extensão clip-x11" e a falha traz a dica de instalação. A sessão vem de `XDG_SESSION_TYPE` (ou, sem ela, de `DISPLAY` sem `WAYLAND_DISPLAY`). `NPASS_TUI_CLIP=clip|clip-x11|wclip` força o backend; qualquer outro valor é ignorado. O OTP segue em `npass otp clip` porque as extensões de clipboard não o cobrem.
+
+O TUI só reconhece uma extensão pelo nome que o `npass extension list` imprime (com ou sem o prefixo `npass-`); linhas que não parecem um nome são exibidas, mas sem ação. Extensões rodam em modo terminal normal, com a saída visível, e a TUI volta com Enter. Contrato: `npass-extensions` (`audit ID [--offline]`, `import FORMATO ID ARQUIVO`, `clip-x11 [CAMPO] ID CAMINHO`).
 
 ## Segurança e escopo
 

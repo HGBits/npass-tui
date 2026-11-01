@@ -37,9 +37,7 @@ COPY_ITEMS=()        # "kind|argument|label"
 COPY_CURSOR=0
 COPY_PATH=''
 COPY_RETURN=entries
-# Extensions screen (X): read-only list from `npass extension list`.
-EXT_LINES=()
-EXT_OFFSET=0
+# Extensions screen (X); the extension logic lives in 05-extensions.bash.
 EXT_RETURN=entries
 ROWS=24
 COLS=80

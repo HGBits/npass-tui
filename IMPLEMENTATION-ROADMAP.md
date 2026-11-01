@@ -126,7 +126,10 @@ A lista é um plano de trabalho, não uma afirmação de que todos os comandos d
 - [ ] Rolagem horizontal ou quebra de linhas longas no preview (hoje terminam em reticências).
 - [ ] Validar manualmente em terminais reais (foot, kitty, alacritty, tty do Linux) o piscar, o redimensionamento e o fallback ASCII; os testes usam um emulador mínimo.
 - [x] Menu de cópia por campo (senha, login, e-mail, PIN, OTP, campo livre, documento inteiro); a exibição do código OTP na tela foi removida (`tests/copy.bats`).
-- [x] Tela de Extensões somente leitura (`npass extension list`), ponto de encaixe para ações futuras (`tests/extensions.bats`).
+- [x] Tela de Extensões com descrição e ações para `audit` e `import`; `passkey` fica na CLI (`tests/extensions.bats`).
+- [x] Copiar só dentro da entrada (preview); backend `clip-x11` automático em sessão X11, `NPASS_TUI_CLIP` para forçar (`tests/copy.bats`).
 - [ ] Menu de cópia com os campos reais da entrada (hoje a lista é fixa; exigiria ler os nomes dos campos do documento decifrado).
-- [ ] Ações sobre extensões (instalar, assinar, executar) a partir da tela de Extensões.
+- [ ] Confirmar com o `npass` real o formato de `extension list` (o core não veio no zip; a TUI aceita nome simples com ou sem `npass-`) e usar os cabeçalhos `npass-extension-desc` em vez da tabela fixa de descrições.
+- [ ] Ações de `passkey` na TUI (list, verify) e opções extras do `audit` (prefixo, `-v`) e do `import`.
+- [ ] OTP em sessão X11: `npass otp clip` depende do core; avaliar copiar via `clip-x11` se o core não cobrir.
 - [x] Leitura de teclado sem timeout e redimensionamento ao vivo por vigia de SIGWINCH (`tests/input.bats`).

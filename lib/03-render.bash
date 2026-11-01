@@ -120,7 +120,7 @@ footer_keys() {
     case $SCREEN in
         identities) items=("1|$G_UPDN|Navegar" '1|Enter|Abrir' '2|X|Extensões' '1|Q|Sair') ;;
         entries) items=("1|$G_UPDN|Navegar" '1|Enter|Abrir' '2|/|Filtrar' '3|A|Criar' '3|E|Editar'
-                        '3|D|Excluir' '2|C|Copiar' '3|X|Extensões' '1|Esc|Voltar') ;;
+                        '3|D|Excluir' '3|X|Extensões' '1|Esc|Voltar') ;;
         preview)
             if (( PREVIEW_REVEAL )); then
                 items=('1|V|Ocultar' "2|$G_UPDN|Rolar" '2|C|Copiar' '1|Esc|Voltar')
@@ -128,7 +128,7 @@ footer_keys() {
                 items=('1|V|Revelar' '2|C|Copiar' '1|Esc|Voltar')
             fi ;;
         copy) items=("1|$G_UPDN|Escolher" '1|Enter|Copiar' '1|Esc|Cancelar') ;;
-        extensions) items=("2|$G_UPDN|Rolar" '1|Esc|Voltar') ;;
+        extensions) items=("1|$G_UPDN|Escolher" '1|Enter|Executar' '1|Esc|Voltar') ;;
     esac
     while :; do
         for sep in "${seps[@]}"; do
@@ -263,7 +263,9 @@ ctx_entry() {
     ctx_field 'Proteção:' 'conteúdo oculto'
     ctx_add "             Só é lido com Enter."
     ctx_add ''
-    ctx_add 'Enter abrir  C copiar'
+    ctx_add 'Enter abre a entrada; dentro dela'
+    ctx_add 'V revela e C copia.'
+    ctx_add ''
     ctx_add 'E editar  D excluir'
 }
 
@@ -310,7 +312,51 @@ draw_copy_menu() {
     ctx_add ''
     ctx_add 'O valor vai direto para a área de'
     ctx_add 'transferência; nada aparece na tela.'
+    [[ -n $CLIP_NOTE ]] && { ctx_add ''; ctx_add "Destino: $CLIP_NOTE"; }
     draw_context 'COPIAR'
+}
+
+# Word-wrap TEXT to WIDTH columns into the Context lines (constant text only).
+ctx_wrap() {
+    local text=$1 width=$2 line='' word
+    set -f
+    for word in $text; do
+        if [[ -n $line ]] && (( ${#line} + ${#word} + 1 > width )); then
+            ctx_add "$line"
+            line=$word
+        else
+            line+=${line:+ }$word
+        fi
+    done
+    set +f
+    [[ -n $line ]] && ctx_add "$line"
+}
+
+draw_extensions() {
+    local i name label
+    CTX=() CTX_A=()
+    if (( ${#EXT_RAW[@]} == 0 )); then
+        ctx_add 'Nenhuma extensão instalada.'
+        draw_context 'EXTENSÕES'
+        return
+    fi
+    for i in "${!EXT_RAW[@]}"; do
+        name=${EXT_NAMES[i]}
+        label=${name:-${EXT_RAW[i]}}
+        if (( i == EXT_CURSOR )); then ctx_add "> $label" "$REV"; else ctx_add "  $label"; fi
+    done
+    name=${EXT_NAMES[EXT_CURSOR]-}
+    ctx_add ''
+    ctx_add "Segundo o npass: ${EXT_RAW[EXT_CURSOR]-}"
+    ctx_add ''
+    if [[ -n $name && -n ${EXT_DESC[$name]-} ]]; then
+        ctx_wrap "${EXT_DESC[$name]}" $((CT_W - 2))
+        ctx_add ''
+        ctx_wrap "${EXT_USE[$name]}" $((CT_W - 2))
+    else
+        ctx_wrap 'Extensão sem ação na TUI; use-a pela CLI.' $((CT_W - 2))
+    fi
+    draw_context 'EXTENSÕES'
 }
 
 draw_too_small() {
@@ -356,7 +402,7 @@ render() {
                         draw_context 'CONTEÚDO  [oculto]'
                     fi ;;
                 copy) draw_copy_menu ;;
-                extensions) draw_text 'EXTENSÕES' EXT_LINES "$EXT_OFFSET" ;;
+                extensions) draw_extensions ;;
             esac ;;
     esac
     draw_separator

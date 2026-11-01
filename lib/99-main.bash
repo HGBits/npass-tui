@@ -48,7 +48,6 @@ main_loop() {
                     run_interactive_npass rm "$REPLY"
                 fi ;;
             entries:enter) if (( ${#VISIBLE[@]} > 0 )); then open_preview "${VISIBLE[CURSOR]}"; fi ;;
-            entries:clip) if (( ${#VISIBLE[@]} > 0 )); then open_copy_menu "${VISIBLE[CURSOR]}"; fi ;;
             preview:quit|preview:back) close_preview ;;
             preview:reveal)
                 if (( PREVIEW_REVEAL )); then PREVIEW_REVEAL=0 PREVIEW_OFFSET=0; else PREVIEW_REVEAL=1; fi ;;
@@ -59,9 +58,10 @@ main_loop() {
             copy:down) (( COPY_CURSOR + 1 < ${#COPY_ITEMS[@]} )) && ((COPY_CURSOR++)) ;;
             copy:enter) copy_selected ;;
             copy:quit|copy:back) SCREEN=$COPY_RETURN; set_status 'Cópia cancelada.' ;;
-            extensions:quit|extensions:back) SCREEN=$EXT_RETURN; EXT_LINES=() ;;
-            extensions:up) (( EXT_OFFSET > 0 )) && ((EXT_OFFSET--)) ;;
-            extensions:down) (( EXT_OFFSET + BODY_H < ${#EXT_LINES[@]} )) && ((EXT_OFFSET++)) ;;
+            extensions:quit|extensions:back) SCREEN=$EXT_RETURN ;;
+            extensions:up) (( EXT_CURSOR > 0 )) && ((EXT_CURSOR--)) ;;
+            extensions:down) (( EXT_CURSOR + 1 < ${#EXT_NAMES[@]} )) && ((EXT_CURSOR++)) ;;
+            extensions:enter) ext_activate ;;
         esac
     done
 }

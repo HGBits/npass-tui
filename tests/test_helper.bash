@@ -80,9 +80,17 @@ case "$1" in
       printf '<!-- npass:md1 -->\n## Senha\nnot-a-real-secret\n'
     fi
     ;;
-  clip)
+  clip | clip-x11 | wclip)
     if [[ ${MOCK_CLIP_FAIL:-0} == 1 ]]; then printf 'FAIL-SECRET-SENTINEL\n'; exit 17; fi
     exit 0
+    ;;
+  audit)
+    printf 'AUDIT-REPORT\n'
+    exit "${MOCK_ACTION_EXIT:-0}"
+    ;;
+  import)
+    printf 'IMPORT-DONE\n'
+    exit "${MOCK_ACTION_EXIT:-0}"
     ;;
   otp)
     # `otp clip` copies; plain `otp` (print the code) must never be called by the TUI.
@@ -99,7 +107,15 @@ case "$1" in
       printf 'safe-ext\033]0;PWNED-EXT\007\033[?9999h\n'
       exit 0
     fi
-    printf 'npass-import  1.0\nnpass-audit  1.0\n'
+    if [[ ${MOCK_EXT_ODD:-0} == 1 ]]; then
+      printf 'Instaladas:\nnpass-zzz  1.0\n'
+      exit 0
+    fi
+    if [[ ${MOCK_EXT_NOCLIP:-0} == 1 ]]; then
+      printf 'npass-audit  0.1.0\nnpass-import  0.1.0\n'
+      exit 0
+    fi
+    printf 'npass-audit  0.1.0\nnpass-import  0.1.0\nnpass-clip-x11  1.0\nnpass-passkey  1.0\n'
     ;;
   *) printf 'unexpected command: %s\n' "$1" >&2; exit 90 ;;
 esac

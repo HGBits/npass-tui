@@ -1,10 +1,22 @@
 #!/usr/bin/env bats
 load test_helper
 
-@test "X lista as extensões reportadas por npass extension list, nas identidades e nas entradas" {
+@test "X lista as extensões do npass com descrição, nas identidades e nas entradas" {
   run_tui_case extensions
   [ "$status" -eq 0 ]
   assert_log_has 'extension list'
+}
+
+@test "extensões sem ação na TUI só explicam o que fazer e não executam nada" {
+  run_tui_case ext-no-action
+  [ "$status" -eq 0 ]
+  run grep -Eq '^(passkey|clip-x11|wclip|audit|import)' "$LOG"
+  [ "$status" -ne 0 ]
+}
+
+@test "linha desconhecida do npass é mostrada, mas não tem ação" {
+  MOCK_EXT_ODD=1 run_tui_case extensions-odd
+  [ "$status" -eq 0 ]
 }
 
 @test "falha da CLI vira mensagem genérica, sem vazar a saída" {
@@ -20,4 +32,49 @@ load test_helper
 @test "sequências de controle na saída das extensões não chegam ao terminal" {
   MOCK_EXT_CONTROL=1 run_tui_case extensions-control
   [ "$status" -eq 0 ]
+}
+
+@test "audit online: pergunta antes e chama npass audit ID" {
+  MOCK_AUDIT_ANSWER=s run_tui_case ext-audit
+  [ "$status" -eq 0 ]
+  assert_log_has 'audit personal'
+}
+
+@test "audit offline: npass audit ID --offline" {
+  MOCK_AUDIT_ANSWER=o run_tui_case ext-audit
+  [ "$status" -eq 0 ]
+  assert_log_has 'audit personal --offline'
+}
+
+@test "audit cancelado não executa nada (nada vai para a rede)" {
+  MOCK_AUDIT_ANSWER= run_tui_case ext-audit
+  [ "$status" -eq 0 ]
+  run grep -Eq '^audit' "$LOG"
+  [ "$status" -ne 0 ]
+}
+
+@test "falha do audit mostra o código e mantém a TUI de pé" {
+  MOCK_ACTION_EXIT=3 run_tui_case ext-audit-fail
+  [ "$status" -eq 0 ]
+}
+
+@test "audit usa a identidade selecionada quando aberto pela lista de identidades" {
+  MOCK_TWO_IDS=1 run_tui_case ext-audit-identity
+  [ "$status" -eq 0 ]
+  assert_log_has 'audit work --offline'
+}
+
+@test "import: formato, arquivo e confirmação; a lista é recarregada depois" {
+  run_tui_case ext-import
+  [ "$status" -eq 0 ]
+  run grep -Eq '^import bitwarden personal /' "$LOG"
+  [ "$status" -eq 0 ]
+  [ "$(grep -Ec '^ls ' "$LOG")" -ge 2 ]
+}
+
+@test "import recusa formato/arquivo inválidos e sem confirmação não executa" {
+  run_tui_case ext-import-invalid
+  [ "$status" -eq 0 ]
+  run grep -Eq '^import' "$LOG"
+  [ "$status" -ne 0 ]
 }

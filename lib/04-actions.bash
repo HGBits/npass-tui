@@ -11,21 +11,25 @@ open_copy_menu() {
     COPY_CURSOR=0
     COPY_PATH=$1
     COPY_RETURN=$SCREEN
+    clip_backend
     SCREEN=copy
 }
 
+# CLIP_CMD (clip, or clip-x11 on X11) is chosen when the menu opens.
 # The value goes straight from npass to the clipboard: the TUI never sees it,
 # and the CLI's output (which could hold it on failure) is not shown.
 copy_to_clipboard() {
     local kind=$1 arg=$2 label=$3 path=$4 output rc
     case $kind in
-        pw) output=$("$NPASS_BIN" clip "$CURRENT_ID" "$path" 2>&1); rc=$? ;;
+        pw) output=$("$NPASS_BIN" "$CLIP_CMD" "$CURRENT_ID" "$path" 2>&1); rc=$? ;;
         otp) output=$("$NPASS_BIN" otp clip "$CURRENT_ID" "$path" 2>&1); rc=$? ;;
-        *) output=$("$NPASS_BIN" clip "$arg" "$CURRENT_ID" "$path" 2>&1); rc=$? ;;
+        *) output=$("$NPASS_BIN" "$CLIP_CMD" "$arg" "$CURRENT_ID" "$path" 2>&1); rc=$? ;;
     esac
     output=''
     if (( rc == 0 )); then
         set_status "Copiado: $label de $path"
+    elif [[ $CLIP_NOTE == 'X11 sem a extensão clip-x11' && $kind != otp ]]; then
+        set_status "Falha ao copiar (código $rc). Em X11 instale a extensão clip-x11."
     else
         set_status "Falha ao copiar (código $rc)."
     fi
@@ -54,25 +58,6 @@ copy_selected() {
         label=$arg
     fi
     copy_to_clipboard "$kind" "$arg" "$label" "$COPY_PATH"
-}
-
-# Extensions are optional and may be disabled: show what `npass extension list`
-# reports and nothing else. Actions on extensions are future work.
-open_extensions() {
-    local output line rc
-    if output=$("$NPASS_BIN" extension list 2>&1); then
-        :
-    else
-        rc=$?
-        set_status "Extensões indisponíveis (código $rc)."
-        return
-    fi
-    EXT_LINES=()
-    while IFS= read -r line; do [[ -n $line ]] && EXT_LINES+=("$line"); done <<< "$output"
-    (( ${#EXT_LINES[@]} )) || EXT_LINES=('Nenhuma extensão instalada.')
-    EXT_OFFSET=0
-    EXT_RETURN=$SCREEN
-    SCREEN=extensions
 }
 
 open_preview() {
