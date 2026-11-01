@@ -85,12 +85,20 @@ teardown() { gpg_test_cleanup; }
   [ "$status" -ne 0 ]
 }
 
-@test "falha ao assinar faz o build falhar e não deixa assinatura" {
+@test "falha ao assinar preserva o binário e a assinatura válidos anteriores" {
   gpg_test_key
+  env NPASS_TUI_SIGN_KEY="$TEST_KEY" bash "$ROOT/build.sh" >/dev/null
+  local old_bin old_sig
+  old_bin="$(sha256sum "$TUI" | cut -d' ' -f1)"
+  old_sig="$(sha256sum "$TUI.asc" | cut -d' ' -f1)"
+
   run env NPASS_TUI_SIGN_KEY=chave-que-nao-existe bash "$ROOT/build.sh"
   [ "$status" -ne 0 ]
   [[ $output == *"falha ao assinar"* ]]
-  [ ! -e "$TUI.asc" ]
+  [ "$(sha256sum "$TUI" | cut -d' ' -f1)" = "$old_bin" ]
+  [ "$(sha256sum "$TUI.asc" | cut -d' ' -f1)" = "$old_sig" ]
+  run gpg --verify "$TUI.asc" "$TUI"
+  [ "$status" -eq 0 ]
 }
 
 @test "build.sh --no-sign remove assinatura antiga em vez de deixá-la órfã" {
