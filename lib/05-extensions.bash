@@ -54,14 +54,15 @@ ext_load() {
     while IFS= read -r line; do
         line=${line#"${line%%[![:space:]]*}"}
         [[ -n $line ]] || continue
-        if [[ $line =~ ^([a-z0-9][a-z0-9-]*):[[:space:]]+ok$ ]]; then
+        if [[ $line =~ ^([a-z0-9][a-z0-9-]*):[[:space:]]+ok$ ]] &&
+            [[ ${BASH_REMATCH[1]} != npass-* ]]; then
             EXT_NAMES+=("${BASH_REMATCH[1]}") EXT_STATE+=(ok) EXT_WHY+=('') EXT_RAW+=("$line")
-        elif [[ $line =~ ^([a-z0-9][a-z0-9-]*):[[:space:]]+recusada[[:space:]]*\(([a-z_]+)\)$ ]]; then
+        elif [[ $line =~ ^([a-z0-9][a-z0-9-]*):[[:space:]]+recusada[[:space:]]*\(([a-z_]+)\)$ ]] &&
+            [[ ${BASH_REMATCH[1]} != npass-* ]]; then
             EXT_NAMES+=("${BASH_REMATCH[1]}") EXT_STATE+=(refused) EXT_WHY+=("${BASH_REMATCH[2]}") EXT_RAW+=("$line")
         else
             EXT_INFO+=("$line")
-        fi
-    done <<< "$output"
+        fi    done <<< "$output"
     EXT_LOADED=1
 }
 
@@ -163,8 +164,8 @@ ext_audit() {
     local id=$1 rc
     prompt_line "Auditar $id [s = HIBP online / o = offline / Enter cancela]: "
     case $REPLY in
-        s | S) run_external audit "$id"; rc=$? ;;
-        o | O) run_external audit "$id" --offline; rc=$? ;;
+        s | S) run_external extension audit "$id"; rc=$? ;;
+        o | O) run_external extension audit "$id" --offline; rc=$? ;;
         *) set_status 'Auditoria cancelada.'; return ;;
     esac
     if (( rc == 0 )); then set_status "Auditoria de $id concluída."; else set_status "npass audit falhou (código $rc)."; fi
@@ -198,10 +199,10 @@ ext_clip_x11() {
     [[ $field == all ]] && label='documento'
     [[ -n $field && $field != all ]] && label="campo $field"
     if [[ -n $field ]]; then
-        output=$("$NPASS_BIN" clip-x11 "$field" "$id" "$path" 2>&1)
+        output=$("$NPASS_BIN" extension clip-x11 "$field" "$id" "$path" 2>&1)
         rc=$?
     else
-        output=$("$NPASS_BIN" clip-x11 "$id" "$path" 2>&1)
+        output=$("$NPASS_BIN" extension clip-x11 "$id" "$path" 2>&1)
         rc=$?
     fi
     output=''
@@ -238,7 +239,7 @@ ext_import() {
         set_status 'Importação cancelada.'
         return
     fi
-    run_external import "$format" "$id" "$file"
+    run_external extension import "$format" "$id" "$file"
     rc=$?
     ext_reload
     if (( rc == 0 )); then set_status "Importação concluída em $id."; else set_status "npass import falhou (código $rc)."; fi
