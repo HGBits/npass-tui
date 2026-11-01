@@ -10,7 +10,7 @@ load test_helper
 @test "extensões sem ação na TUI só explicam o que fazer e não executam nada" {
   run_tui_case ext-no-action
   [ "$status" -eq 0 ]
-  run grep -Eq '^extension (audit|import|clip-x11|passkey|wclip)' "$LOG"
+  run grep -Eq '^(audit|import|xclip|passkey|wclip)' "$LOG"
   [ "$status" -ne 0 ]
 }
 
@@ -82,7 +82,7 @@ load test_helper
 @test "extensão recusada pelo npass aparece com o motivo e não é executada" {
   MOCK_EXT_REFUSED=1 run_tui_case extensions-refused
   [ "$status" -eq 0 ]
-  run grep -Eq '^extension (audit|import|clip-x11)' "$LOG"
+  run grep -Eq '^(audit|import|xclip)' "$LOG"
   [ "$status" -ne 0 ]
 }
 
