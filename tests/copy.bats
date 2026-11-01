@@ -63,7 +63,7 @@ load test_helper
   [ "$status" -eq 0 ]
   run_tui_case copy-password
   assert_log_has 'clip personal example/login'
-  run grep -Fq 'clip-x11' "$LOG"
+  run grep -Fq 'xclip' "$LOG"
   [ "$status" -ne 0 ]
 }
 
@@ -103,6 +103,12 @@ load test_helper
 
 @test "NPASS_TUI_CLIP com valor desconhecido é ignorado" {
   MOCK_CLIP_OVERRIDE='evil;rm' run_tui_case copy-password
+  [ "$status" -eq 0 ]
+  assert_log_has 'clip personal example/login'
+}
+
+@test "NPASS_TUI_CLIP=clip-x11 é rejeitado como valor desconhecido" {
+  MOCK_CLIP_OVERRIDE=clip-x11 run_tui_case copy-password
   [ "$status" -eq 0 ]
   assert_log_has 'clip personal example/login'
 }

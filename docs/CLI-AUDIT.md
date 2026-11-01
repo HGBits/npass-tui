@@ -96,7 +96,7 @@ Regra arquitetural importante: a TUI deve chamar a CLI pública e não depender 
 - `npass git ARGS...`, `npass log`, `npass loglong`: histórico do store. Todo store é inicializado como repositório Git; escritas fazem commits automáticos.
 - `npass diceware` e `npass memorable`: geração de frases.
 - `npass open [--here] [--pause] npass://ID/CAMINHO`: somente exibe após confirmação antes de decifrar; rejeita URLs/caminhos inválidos. Não é necessário à navegação básica da TUI.
-- `npass extension sign|list|install`: gerenciamento de extensões assinadas. `import`, `audit`, `passkey`, `clip-x11` e `wclip` são extensões, não operações nativas que a TUI deva presumir disponíveis.
+- `npass extension list`: lista e verifica extensões assinadas. A execução é direta: `npass import`, `npass audit`, `npass passkey`, `npass xclip` (alias da extensão `clip-x11`) e `npass wclip`; a TUI deve detectar quando cada extensão não está instalada.
 - `migrate` e `migrate-secrets`: encaminhamento antigo removido; a mensagem aponta para a extensão de importação. Não basear a TUI nesses comandos.
 - A ajuda é organizada por categoria: `npass help`, `npass help entradas`, `npass help gerar`, `npass help otp`. Nem todo comando oferece `--help` próprio.
 
