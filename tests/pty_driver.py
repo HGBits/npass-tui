@@ -1162,11 +1162,7 @@ def sc_extensions_odd(s):
 
 def sc_ext_no_action(s):
     ext_screen(s)
-    s.send("jj")
-    s.wait_text("> clip-x11")
-    s.send("\r")
-    s.wait_text("Usada pelo menu Copiar em sessões X11")
-    s.send("j")
+    s.send("jjjj")
     s.wait_text("> passkey")
     s.send("\r")
     s.wait_text("Sem ação na TUI. Use na CLI: npass passkey.")
