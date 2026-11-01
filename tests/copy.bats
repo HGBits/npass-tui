@@ -63,7 +63,7 @@ load test_helper
   [ "$status" -eq 0 ]
   run_tui_case copy-password
   assert_log_has 'clip personal example/login'
-  run grep -Fq 'clip-x11' "$LOG"
+  run grep -Fq 'xclip' "$LOG"
   [ "$status" -ne 0 ]
 }
 
