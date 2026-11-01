@@ -36,7 +36,7 @@ declare -A EXT_DESC=(
 declare -A EXT_USE=(
     [audit]='Enter audita a identidade selecionada.'
     [import]='Enter importa um arquivo para a identidade selecionada.'
-    [passkey]='Sem ação na TUI. Use na CLI: npass passkey.'
+    [passkey]='Sem ação na TUI. Use na CLI: npass extension passkey.'
     [clip-x11]='Enter copia a senha ou um campo da entrada selecionada via xclip (X11).'
     [wclip]='Usada pelo menu Copiar com NPASS_TUI_CLIP=wclip, sem ação aqui.'
 )
