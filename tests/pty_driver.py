@@ -46,6 +46,8 @@ class Session:
         env["XDG_SESSION_TYPE"] = os.environ.get("MOCK_SESSION", "wayland")
         for var in ("DISPLAY", "WAYLAND_DISPLAY", "NPASS_TUI_CLIP"):
             env.pop(var, None)
+        if os.environ.get("MOCK_SESSION") == "x11" and os.environ.get("MOCK_DISPLAY"):
+            env["DISPLAY"] = os.environ["MOCK_DISPLAY"]
         if os.environ.get("MOCK_CLIP_OVERRIDE"):
             env["NPASS_TUI_CLIP"] = os.environ["MOCK_CLIP_OVERRIDE"]
         env.pop("LINES", None)
