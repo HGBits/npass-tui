@@ -113,9 +113,9 @@ NPASS_BIN="$HOME/.local/bin/npass" ./bin/npass-tui
 
 ## Clipboard e extensões
 
-O menu Copiar chama `npass clip`, que usa o clipboard Wayland do core. Em **sessão X11** (por exemplo bspwm) o TUI usa a extensão `clip-x11`, que tem a mesma linha de comando, desde que ela esteja instalada; se não estiver, o menu avisa "X11 sem a extensão clip-x11" e a falha traz a dica de instalação. A sessão vem de `XDG_SESSION_TYPE` (ou, sem ela, de `DISPLAY` sem `WAYLAND_DISPLAY`). `NPASS_TUI_CLIP=clip|clip-x11|wclip` força o backend; qualquer outro valor é ignorado. O OTP segue em `npass otp clip` porque as extensões de clipboard não o cobrem.
+O menu Copiar chama `npass clip`, que usa o clipboard Wayland do core. Em **sessão X11** (por exemplo bspwm) o TUI usa a extensão `clip-x11`, que tem a mesma linha de comando, desde que ela esteja instalada; se não estiver, o menu avisa "X11 sem a extensão clip-x11" e a falha traz a dica de instalação. A sessão vem de `XDG_SESSION_TYPE` (ou, sem ela, de `DISPLAY` sem `WAYLAND_DISPLAY`). `NPASS_TUI_CLIP=clip|xclip|wclip (clip-x11 ainda é aceito como alias antigo)` força o backend; qualquer outro valor é ignorado. O OTP segue em `npass otp clip` porque as extensões de clipboard não o cobrem.
 
-A lista vem de `npass extension list`, que imprime `nome: ok` ou `nome: recusada (motivo)` por extensão (o core confere dono, permissões e assinatura). Extensão recusada aparece com o motivo (`sem_sig`, `permissao`, `assinatura_invalida`, ...) e nunca é executada. `audit` e `import` rodam no terminal normal, com saída visível; `clip-x11` captura e descarta a saída da extensão para impedir que qualquer valor copiado apareça na TUI. Contratos: `npass-extensions` (`audit ID [--offline]`, `import FORMATO ID ARQUIVO`, `xclip [CAMPO] ID CAMINHO`).
+A lista vem de `npass extension list`, que imprime `nome: ok` ou `nome: recusada (motivo)` por extensão (o core confere dono, permissões e assinatura). Extensão recusada aparece com o motivo (`sem_sig`, `permissao`, `assinatura_invalida`, ...) e nunca é executada. `audit` e `import` rodam no terminal normal, com saída visível; `xclip` captura e descarta a saída da extensão para impedir que qualquer valor copiado apareça na TUI. Contratos: `npass-extensions` (`audit ID [--offline]`, `import FORMATO ID ARQUIVO`, `xclip [CAMPO] ID CAMINHO`).
 
 ## Segurança e escopo
 
