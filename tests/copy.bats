@@ -67,17 +67,17 @@ load test_helper
   [ "$status" -ne 0 ]
 }
 
-@test "sessão X11 com a extensão instalada usa clip-x11 para senha, campo e documento" {
-  MOCK_SESSION=x11 MOCK_EXPECT_NOTE='clip-x11 (sessão X11)' run_tui_case copy-backend-note
+@test "sessão X11 com a extensão instalada usa xclip para senha, campo e documento" {
+  MOCK_SESSION=x11 MOCK_EXPECT_NOTE='xclip (sessão X11)' run_tui_case copy-backend-note
   [ "$status" -eq 0 ]
   MOCK_SESSION=x11 run_tui_case copy-field
   [ "$status" -eq 0 ]
-  assert_log_has 'clip-x11 login personal example/login'
-  assert_log_has 'clip-x11 pin personal example/login'
+  assert_log_has 'xclip login personal example/login'
+  assert_log_has 'xclip pin personal example/login'
   MOCK_SESSION=x11 run_tui_case copy-all
-  assert_log_has 'clip-x11 all personal example/login'
+  assert_log_has 'xclip all personal example/login'
   MOCK_SESSION=x11 run_tui_case copy-password
-  assert_log_has 'clip-x11 personal example/login'
+  assert_log_has 'xclip personal example/login'
 }
 
 @test "em X11 o OTP continua em npass otp clip (a extensão não cobre OTP)" {
