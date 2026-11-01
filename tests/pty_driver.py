@@ -1093,7 +1093,7 @@ def sc_extensions(s):
     need("COFRE / EXTENSÕES" in s.screen.line(0), "cabeçalho da tela de extensões")
     for name in ("audit", "import", "clip-x11", "passkey"):
         need(name in s.screen.text(), "extensão %r não listada" % name)
-    need("Segundo o npass: npass-audit  0.1.0" in s.screen.text(), "linha original do npass ausente")
+    need("Segundo o npass: audit: ok" in s.screen.text(), "linha original do npass ausente")
     need("Audita as senhas" in s.screen.text(), "descrição do audit ausente")
     s.send("j")
     s.wait_text("> import", "Importa senhas")
@@ -1151,11 +1151,7 @@ def sc_extensions_control(s):
 def sc_extensions_odd(s):
     wait_identities(s)
     s.send("x")
-    s.wait_text("EXTENSÕES", "Instaladas:", "zzz")
-    s.send("\r")
-    s.wait_text("Sem ação na TUI para instaladas.")
-    s.send("j")
-    s.wait_text("> zzz")
+    s.wait_text("EXTENSÕES", "> zzz", "Extensão sem ação na TUI")
     s.send("\r")
     s.wait_text("Sem ação na TUI para zzz.")
     s.send("q")
@@ -1294,29 +1290,46 @@ def sc_ext_import_invalid(s):
         os.unlink(path)
 
 
-def sc_extensions_format(s):
-    """Qualquer formato razoável de `extension list` precisa dar ação a audit e import."""
+def sc_extensions_refused(s):
+    open_identity(s)
+    wait_entries(s)
+    s.send("x")
+    s.wait_text("EXTENSÕES", "> audit  (recusada)", "Recusada pelo npass: assinatura inválida")
+    need("import" in s.screen.text() and "clip-x11  (recusada)" in s.screen.text(), "lista sem os estados")
+    s.send("\r")
+    s.wait_text("audit foi recusada pelo npass: assinatura inválida.")
+    s.send("jj")
+    s.wait_text("> clip-x11  (recusada)", "dono ou permissões inseguros")
+    s.send("k")
+    s.wait_text("> import", "Enter importa um arquivo")
+    need("Recusada pelo npass" not in s.screen.text(), "aviso de recusa ficou na extensão aceita")
+    s.send("q")
+    wait_entries(s)
+    quit_tui(s)
+
+
+def sc_extensions_nodir(s):
     wait_identities(s)
     s.send("x")
-    s.wait_text("EXTENSÕES")
-    # a primeira linha pode ser um cabeçalho; procura o audit descendo a lista
-    for _ in range(4):
-        if "Audita as senhas" in s.screen.text():
-            break
-        s.send("j")
-        s.settle(0.1)
-    need("Audita as senhas" in s.screen.text(), "audit não foi reconhecido: %s" % s.screen.text())
-    need("Enter audita a identidade" in s.screen.text(), "audit sem a ação da TUI")
-    s.send("j")
-    s.wait_text("Importa senhas", "Enter importa um arquivo")
+    s.wait_text("EXTENSÕES", "Nenhuma extensão instalada.", "Nenhum diretório de extensões encontrado")
     s.send("q")
     wait_identities(s)
     s.send("q")
-    check_clean_exit(s, "extensions-format")
+    check_clean_exit(s, "extensions-nodir")
+
+
+def sc_copy_x11_refused(s):
+    at_copy_menu(s)
+    need("Destino: clip-x11 recusada pelo npass" in s.screen.text(), "menu sem o aviso de recusa")
+    s.send("\r")
+    s.wait_text("Falha ao copiar (código 17). A extensão clip-x11 foi recusada pelo npass (veja X).")
+    finish_from_preview(s)
 
 
 SCENARIOS = {
-    "extensions-format": sc_extensions_format,
+    "extensions-refused": sc_extensions_refused,
+    "extensions-nodir": sc_extensions_nodir,
+    "copy-x11-refused": sc_copy_x11_refused,
     "copy-backend-note": sc_copy_backend_note,
     "copy-no-note": sc_copy_no_note,
     "copy-x11-missing": sc_copy_x11_missing,

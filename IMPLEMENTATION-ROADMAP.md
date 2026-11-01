@@ -129,7 +129,7 @@ A lista é um plano de trabalho, não uma afirmação de que todos os comandos d
 - [x] Tela de Extensões com descrição e ações para `audit` e `import`; `passkey` fica na CLI (`tests/extensions.bats`).
 - [x] Copiar só dentro da entrada (preview); backend `clip-x11` automático em sessão X11, `NPASS_TUI_CLIP` para forçar (`tests/copy.bats`).
 - [ ] Menu de cópia com os campos reais da entrada (hoje a lista é fixa; exigiria ler os nomes dos campos do documento decifrado).
-- [ ] Confirmar com o `npass` real o formato de `extension list` (o core não veio no zip; a TUI aceita nome simples com ou sem `npass-`) e usar os cabeçalhos `npass-extension-desc` em vez da tabela fixa de descrições.
+- [x] Formato de `extension list` confirmado em `lib/11-extensions.bash` do core (`nome: ok` / `nome: recusada (motivo)`). Falta usar os cabeçalhos `npass-extension-desc` em vez da tabela fixa de descrições.
 - [ ] Ações de `passkey` na TUI (list, verify) e opções extras do `audit` (prefixo, `-v`) e do `import`.
 - [ ] OTP em sessão X11: `npass otp clip` depende do core; avaliar copiar via `clip-x11` se o core não cobrir.
 - [x] Leitura de teclado sem timeout e redimensionamento ao vivo por vigia de SIGWINCH (`tests/input.bats`).

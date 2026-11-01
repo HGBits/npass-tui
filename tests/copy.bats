@@ -106,3 +106,11 @@ load test_helper
   [ "$status" -eq 0 ]
   assert_log_has 'clip personal example/login'
 }
+
+@test "X11 com clip-x11 recusada pelo npass: avisa no menu e na falha, sem usar a extensão" {
+  MOCK_SESSION=x11 MOCK_EXT_REFUSED=1 MOCK_CLIP_FAIL=1 run_tui_case copy-x11-refused
+  [ "$status" -eq 0 ]
+  assert_log_has 'clip personal example/login'
+  run grep -Eq '^clip-x11' "$LOG"
+  [ "$status" -ne 0 ]
+}

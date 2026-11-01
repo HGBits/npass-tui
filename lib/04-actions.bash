@@ -30,6 +30,8 @@ copy_to_clipboard() {
         set_status "Copiado: $label de $path"
     elif [[ $CLIP_NOTE == 'X11 sem a extensão clip-x11' && $kind != otp ]]; then
         set_status "Falha ao copiar (código $rc). Em X11 instale a extensão clip-x11."
+    elif [[ $CLIP_NOTE == 'clip-x11 recusada pelo npass' && $kind != otp ]]; then
+        set_status "Falha ao copiar (código $rc). A extensão clip-x11 foi recusada pelo npass (veja X)."
     else
         set_status "Falha ao copiar (código $rc)."
     fi

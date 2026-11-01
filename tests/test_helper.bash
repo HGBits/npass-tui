@@ -101,27 +101,24 @@ case "$1" in
     printf 'OTP-SENTINEL-123456\n'
     ;;
   extension)
+    # Formato real do core (lib/11-extensions.bash): "nome: ok" ou "nome: recusada (motivo)".
     if [[ ${MOCK_EXT_FAIL:-0} == 1 ]]; then printf 'FAIL-SECRET-SENTINEL\n'; exit 17; fi
     if [[ ${MOCK_EXT_EMPTY:-0} == 1 ]]; then exit 0; fi
     if [[ ${MOCK_EXT_CONTROL:-0} == 1 ]]; then
       printf 'safe-ext\033]0;PWNED-EXT\007\033[?9999h\n'
       exit 0
     fi
-    case ${MOCK_EXT_FORMAT:-} in
-      bullets) printf 'Extensões instaladas:\n  • audit — audita senhas\n  ✓ import (v0.1.0)\n'; exit 0 ;;
-      ansi) printf '\033[1;32m●\033[0m \033[1maudit\033[0m  0.1.0\n\033[1;32m●\033[0m \033[1mimport\033[0m  0.1.0\n'; exit 0 ;;
-      paths) printf '/usr/lib/npass/extensions/npass-audit\n/usr/lib/npass/extensions/npass-import.bash\n'; exit 0 ;;
-      table) printf 'NOME      VERSÃO  DESCRIÇÃO\naudit     0.1.0   Audita senhas\nimport    0.1.0   Importa senhas\n'; exit 0 ;;
-    esac
-    if [[ ${MOCK_EXT_ODD:-0} == 1 ]]; then
-      printf 'Instaladas:\nnpass-zzz  1.0\n'
+    if [[ ${MOCK_EXT_NODIR:-0} == 1 ]]; then
+      printf 'Nenhum diretório de extensões encontrado: /usr/local/share/npass/extensions /usr/share/npass/extensions\n'
       exit 0
     fi
-    if [[ ${MOCK_EXT_NOCLIP:-0} == 1 ]]; then
-      printf 'npass-audit  0.1.0\nnpass-import  0.1.0\n'
+    if [[ ${MOCK_EXT_ODD:-0} == 1 ]]; then printf 'zzz: ok\n'; exit 0; fi
+    if [[ ${MOCK_EXT_NOCLIP:-0} == 1 ]]; then printf 'audit: ok\nimport: ok\n'; exit 0; fi
+    if [[ ${MOCK_EXT_REFUSED:-0} == 1 ]]; then
+      printf 'audit: recusada (assinatura_invalida)\nimport: ok\nclip-x11: recusada (permissao)\n'
       exit 0
     fi
-    printf 'npass-audit  0.1.0\nnpass-import  0.1.0\nnpass-clip-x11  1.0\nnpass-passkey  1.0\n'
+    printf 'audit: ok\nimport: ok\nclip-x11: ok\npasskey: ok\n'
     ;;
   *) printf 'unexpected command: %s\n' "$1" >&2; exit 90 ;;
 esac

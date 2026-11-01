@@ -114,7 +114,7 @@ NPASS_BIN="$HOME/.local/bin/npass" ./bin/npass-tui
 
 O menu Copiar chama `npass clip`, que usa o clipboard Wayland do core. Em **sessão X11** (por exemplo bspwm) o TUI usa a extensão `clip-x11`, que tem a mesma linha de comando, desde que ela esteja instalada; se não estiver, o menu avisa "X11 sem a extensão clip-x11" e a falha traz a dica de instalação. A sessão vem de `XDG_SESSION_TYPE` (ou, sem ela, de `DISPLAY` sem `WAYLAND_DISPLAY`). `NPASS_TUI_CLIP=clip|clip-x11|wclip` força o backend; qualquer outro valor é ignorado. O OTP segue em `npass otp clip` porque as extensões de clipboard não o cobrem.
 
-O TUI só reconhece uma extensão pelo nome que o `npass extension list` imprime (com ou sem o prefixo `npass-`); linhas que não parecem um nome são exibidas, mas sem ação. Extensões rodam em modo terminal normal, com a saída visível, e a TUI volta com Enter. Contrato: `npass-extensions` (`audit ID [--offline]`, `import FORMATO ID ARQUIVO`, `clip-x11 [CAMPO] ID CAMINHO`).
+A lista vem de `npass extension list`, que imprime `nome: ok` ou `nome: recusada (motivo)` por extensão (o core confere dono, permissões e assinatura). Extensão recusada aparece com o motivo (`sem_sig`, `permissao`, `assinatura_invalida`, ...) e a TUI nunca a executa nem a usa como backend de clipboard. Qualquer outra linha (por exemplo o aviso de que não há diretório de extensões) é mostrada como aviso. Extensões rodam em modo terminal normal, com a saída visível, e a TUI volta com Enter. Contrato: `npass-extensions` (`audit ID [--offline]`, `import FORMATO ID ARQUIVO`, `clip-x11 [CAMPO] ID CAMINHO`).
 
 ## Segurança e escopo
 

@@ -4,14 +4,26 @@
 #   - the copy menu picks the clipboard backend (clip, or clip-x11 on X11);
 #   - the Extensions screen (X) runs the ones that have a TUI action.
 
-EXT_NAMES=()      # short name per listed extension ("" when no word looks like one)
-EXT_FOUND=''
-EXT_RAW=()        # the line as `npass extension list` printed it
+EXT_NAMES=()      # extension name, as `npass extension list` prints it
+EXT_STATE=()      # "ok" or "refused" (the core checked ownership and signature)
+EXT_WHY=()        # the core's reason when refused (sem_sig, permissao, ...)
+EXT_RAW=()        # the line as the core printed it
+EXT_INFO=()       # other lines, e.g. the notice that no extension directory exists
 EXT_CURSOR=0
 EXT_LOADED=0
 EXT_RC=0
 CLIP_CMD=clip     # command behind "copy": clip, clip-x11 or wclip
 CLIP_NOTE=''      # why, when it is not the default
+
+# Reasons the core gives when it refuses an extension (lib/11-extensions.bash).
+declare -A EXT_WHY_TEXT=(
+    [sem_sig]='sem o arquivo de assinatura (.sig)'
+    [permissao]='dono ou permissões inseguros (precisa ser do root, sem escrita para grupo/outros)'
+    [assinatura_invalida]='assinatura inválida'
+    [symlink]='é um link simbólico'
+    [ausente]='arquivo ausente ou não executável'
+    [nome_invalido]='nome inválido'
+)
 
 # What the TUI knows about the official extensions (README of npass-extensions).
 declare -A EXT_DESC=(
@@ -29,51 +41,45 @@ declare -A EXT_USE=(
     [wclip]='Usada pelo menu Copiar com NPASS_TUI_CLIP=wclip, sem ação aqui.'
 )
 
-# Short name of the extension a `npass extension list` line talks about, in
-# EXT_FOUND. The core's format is not fixed here, so be lenient: the line is
-# split into words (anything but letters, digits and "-" separates), and the
-# first word that is a known extension wins ("npass-audit", "audit.bash",
-# "/usr/lib/npass/extensions/npass-audit", "* audit - ..." and "[ok] audit"
-# all give "audit"). Without a known one, the first plain word is used.
-ext_name_of() {
-    local words=${1//[^A-Za-z0-9-]/ } word first=''
-    EXT_FOUND=''
-    set -f
-    for word in $words; do
-        word=${word,,}
-        word=${word#npass-}
-        [[ $word == bash ]] && continue
-        if [[ -n ${EXT_DESC[$word]+x} ]]; then
-            EXT_FOUND=$word
-            set +f
-            return 0
-        fi
-        [[ -z $first && $word =~ ^[a-z][a-z0-9-]{0,31}$ ]] && first=$word
-    done
-    set +f
-    EXT_FOUND=$first
-}
-
-# Fills EXT_NAMES/EXT_RAW from `npass extension list`. Returns 1, with the exit
-# code in EXT_RC, when the command is not available.
+# Fills the EXT_* arrays from `npass extension list`. The core prints one line
+# per extension, "NAME: ok" or "NAME: recusada (MOTIVO)" (the motive is a fixed
+# word such as permissao or assinatura_invalida), and a different notice when it
+# finds no extension directory. Any other line is kept in EXT_INFO. Returns 1,
+# with the exit code in EXT_RC, when the command is not available.
 ext_load() {
     local output line
     output=$("$NPASS_BIN" extension list 2>&1) || { EXT_RC=$?; return 1; }
     output=$(sanitize_text "$output")
-    EXT_NAMES=() EXT_RAW=()
+    EXT_NAMES=() EXT_STATE=() EXT_WHY=() EXT_RAW=() EXT_INFO=()
     while IFS= read -r line; do
         line=${line#"${line%%[![:space:]]*}"}
         [[ -n $line ]] || continue
-        ext_name_of "$line"
-        EXT_NAMES+=("$EXT_FOUND")
-        EXT_RAW+=("$line")
+        if [[ $line =~ ^([a-z0-9][a-z0-9-]*):[[:space:]]+ok$ ]]; then
+            EXT_NAMES+=("${BASH_REMATCH[1]}") EXT_STATE+=(ok) EXT_WHY+=('') EXT_RAW+=("$line")
+        elif [[ $line =~ ^([a-z0-9][a-z0-9-]*):[[:space:]]+recusada[[:space:]]*\(([a-z_]+)\)$ ]]; then
+            EXT_NAMES+=("${BASH_REMATCH[1]}") EXT_STATE+=(refused) EXT_WHY+=("${BASH_REMATCH[2]}") EXT_RAW+=("$line")
+        else
+            EXT_INFO+=("$line")
+        fi
     done <<< "$output"
     EXT_LOADED=1
 }
 
+# ext_installed NAME: listed and accepted by the core.
 ext_installed() {
-    local n
-    for n in "${EXT_NAMES[@]}"; do [[ $n == "$1" ]] && return 0; done
+    local i
+    for i in "${!EXT_NAMES[@]}"; do
+        [[ ${EXT_NAMES[i]} == "$1" && ${EXT_STATE[i]} == ok ]] && return 0
+    done
+    return 1
+}
+
+# ext_refused NAME: listed but refused by the core.
+ext_refused() {
+    local i
+    for i in "${!EXT_NAMES[@]}"; do
+        [[ ${EXT_NAMES[i]} == "$1" && ${EXT_STATE[i]} == refused ]] && return 0
+    done
     return 1
 }
 
@@ -101,6 +107,8 @@ clip_backend() {
     if ext_installed clip-x11; then
         CLIP_CMD=clip-x11
         CLIP_NOTE='clip-x11 (sessão X11)'
+    elif ext_refused clip-x11; then
+        CLIP_NOTE='clip-x11 recusada pelo npass'
     else
         CLIP_NOTE='X11 sem a extensão clip-x11'
     fi
@@ -196,14 +204,18 @@ ext_import() {
 
 # Enter on the Extensions screen.
 ext_activate() {
-    local name=${EXT_NAMES[EXT_CURSOR]-} id
-    (( ${#EXT_RAW[@]} )) || return 0
+    local name=${EXT_NAMES[EXT_CURSOR]-} id why
+    (( ${#EXT_NAMES[@]} )) || return 0
+    if [[ ${EXT_STATE[EXT_CURSOR]} == refused ]]; then
+        why=${EXT_WHY[EXT_CURSOR]}
+        set_status "$name foi recusada pelo npass: ${EXT_WHY_TEXT[$why]:-$why}."
+        return
+    fi
     id=$(ext_target_id)
     case $name in
         audit | import)
             if [[ -z $id ]]; then set_status 'Nenhuma identidade selecionada.'; return; fi
             "ext_$name" "$id" ;;
-        '') set_status 'Sem ação na TUI para esta extensão.' ;;
         *) set_status "${EXT_USE[$name]:-Sem ação na TUI para $name.}" ;;
     esac
 }

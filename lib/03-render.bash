@@ -333,25 +333,31 @@ ctx_wrap() {
 }
 
 draw_extensions() {
-    local i name label
+    local i name label why
     CTX=() CTX_A=()
-    if (( ${#EXT_RAW[@]} == 0 )); then
+    if (( ${#EXT_NAMES[@]} == 0 )); then
         ctx_add 'Nenhuma extensão instalada.'
+        for label in "${EXT_INFO[@]}"; do ctx_add ''; ctx_wrap "$label" $((CT_W - 2)); done
         draw_context 'EXTENSÕES'
         return
     fi
-    for i in "${!EXT_RAW[@]}"; do
-        name=${EXT_NAMES[i]}
-        label=${name:-${EXT_RAW[i]}}
+    for i in "${!EXT_NAMES[@]}"; do
+        label=${EXT_NAMES[i]}
+        [[ ${EXT_STATE[i]} == refused ]] && label+='  (recusada)'
         if (( i == EXT_CURSOR )); then ctx_add "> $label" "$REV"; else ctx_add "  $label"; fi
     done
-    name=${EXT_NAMES[EXT_CURSOR]-}
+    name=${EXT_NAMES[EXT_CURSOR]}
     ctx_add ''
-    ctx_add "Segundo o npass: ${EXT_RAW[EXT_CURSOR]-}"
+    ctx_add "Segundo o npass: ${EXT_RAW[EXT_CURSOR]}"
     ctx_add ''
-    if [[ -n $name && -n ${EXT_DESC[$name]-} ]]; then
+    if [[ -n ${EXT_DESC[$name]-} ]]; then
         ctx_wrap "${EXT_DESC[$name]}" $((CT_W - 2))
         ctx_add ''
+    fi
+    if [[ ${EXT_STATE[EXT_CURSOR]} == refused ]]; then
+        why=${EXT_WHY[EXT_CURSOR]}
+        ctx_wrap "Recusada pelo npass: ${EXT_WHY_TEXT[$why]:-$why}. A TUI não a executa." $((CT_W - 2))
+    elif [[ -n ${EXT_USE[$name]-} ]]; then
         ctx_wrap "${EXT_USE[$name]}" $((CT_W - 2))
     else
         ctx_wrap 'Extensão sem ação na TUI; use-a pela CLI.' $((CT_W - 2))

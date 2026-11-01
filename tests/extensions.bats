@@ -79,19 +79,25 @@ load test_helper
   [ "$status" -ne 0 ]
 }
 
-@test "formatos variados de extension list (bullets, cores, caminhos, tabela) acham audit e import" {
-  for fmt in bullets ansi paths table; do
-    MOCK_EXT_FORMAT=$fmt run_tui_case extensions-format
-    if (( status != 0 )); then echo "formato: $fmt" >&2; fi
-    [ "$status" -eq 0 ]
-  done
+@test "extensão recusada pelo npass aparece com o motivo e não é executada" {
+  MOCK_EXT_REFUSED=1 run_tui_case extensions-refused
+  [ "$status" -eq 0 ]
+  run grep -Eq '^(audit|import|clip-x11)' "$LOG"
+  [ "$status" -ne 0 ]
 }
 
-@test "nome da extensão sai de linhas como npass-audit, audit.bash, caminhos e bullets" {
-  run bash -c "source '$ROOT/lib/00-core.bash' 2>/dev/null; source '$ROOT/lib/05-extensions.bash'
-    for l in 'npass-audit  0.1.0' 'audit - Audita' '* audit' '[ok] npass-audit' '/usr/lib/npass/extensions/npass-audit' 'npass-import.bash' 'clip-x11 (xclip)' 'npass-clip-x11.bash' '  ● passkey'; do
-      ext_name_of \"\$l\"; printf '%s\\n' \"\$EXT_FOUND\"
-    done"
+@test "sem diretório de extensões o aviso do npass aparece no lugar da lista" {
+  MOCK_EXT_NODIR=1 run_tui_case extensions-nodir
   [ "$status" -eq 0 ]
-  [ "$output" = "$(printf 'audit\naudit\naudit\naudit\naudit\nimport\nclip-x11\nclip-x11\npasskey')" ]
+}
+
+@test "ext_load entende 'nome: ok', 'nome: recusada (motivo)' e guarda o resto como aviso" {
+  run bash -c "source '$ROOT/lib/00-core.bash' 2>/dev/null; source '$ROOT/lib/05-extensions.bash'
+    NPASS_BIN='$MOCK_NPASS' NPASS_LOG=/dev/null MOCK_EXT_REFUSED=1 ext_load
+    printf '%s|%s|%s\\n' \"\${EXT_NAMES[*]}\" \"\${EXT_STATE[*]}\" \"\${EXT_WHY[*]}\"
+    NPASS_BIN='$MOCK_NPASS' NPASS_LOG=/dev/null MOCK_EXT_NODIR=1 ext_load
+    printf '%s|%s\\n' \"\${#EXT_NAMES[@]}\" \"\${#EXT_INFO[@]}\""
+  [ "$status" -eq 0 ]
+  [ "${lines[0]}" = "audit import clip-x11|refused ok refused|assinatura_invalida  permissao" ]
+  [ "${lines[1]}" = "0|1" ]
 }
