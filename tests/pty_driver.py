@@ -1234,11 +1234,13 @@ def sc_ext_clip_x11(s):
     s.read_until("Campo (vazio = senha")
     answer = os.environ.get("MOCK_CLIP_ANSWER", "")
     s.send(answer + "\n")
-    if answer.startswith("-") or not answer:
-        if answer.startswith("-"):
-            s.wait_text("Nome de campo inválido.")
-        else:
-            s.wait_text("Copiado via clip-x11: senha")
+    if answer.startswith("-"):
+        s.wait_text("Nome de campo inválido.")
+    elif os.environ.get("MOCK_CLIP_FAIL") == "1":
+        s.wait_text("clip-x11 falhou (código 17).")
+        need(not s.raw_has(FAIL_SENTINEL), "saída arbitrária da extensão chegou ao terminal")
+    elif not answer:
+        s.wait_text("Copiado via clip-x11: senha")
     else:
         s.wait_text("Copiado via clip-x11:")
     need(not s.screen.has("not-a-real-secret"), "conteúdo da entrada apareceu na tela")
