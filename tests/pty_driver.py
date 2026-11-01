@@ -1249,6 +1249,20 @@ def sc_ext_clip_x11(s):
     quit_tui(s)
 
 
+def sc_ext_clip_x11_without_entry(s):
+    wait_identities(s)
+    s.send("x")
+    s.wait_text("EXTENSÕES", "> audit")
+    s.send("jj")
+    s.wait_text("> clip-x11")
+    s.send("\r")
+    s.wait_text("Abra uma entrada antes de usar clip-x11.")
+    need(not any(line.startswith("clip-x11 ") for line in open(os.environ["NPASS_LOG"])), "clip-x11 executada sem entrada")
+    s.send("q")
+    wait_identities(s)
+    quit_tui(s)
+
+
 def sc_ext_clip_x11_no_session(s):
     ext_screen(s)
     s.send("jj")
@@ -1387,7 +1401,7 @@ SCENARIOS = {
     "ext-audit-fail": sc_ext_audit_fail,
     "ext-audit-identity": sc_ext_audit_identity,
     "ext-clip-x11": sc_ext_clip_x11,
-    "ext-clip-x11-no-session": sc_ext_clip_x11_no_session,
+    "ext-clip-x11-no-session": sc_ext_clip_x11_no_session,\n    "ext-clip-x11-without-entry": sc_ext_clip_x11_without_entry,
     "ext-clip-x11-refused": sc_ext_clip_x11_refused,
     "ext-import": sc_ext_import,
     "ext-import-invalid": sc_ext_import_invalid,
