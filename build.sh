@@ -36,11 +36,11 @@ out="bin/npass-tui"
 sig="$out.asc"
 mkdir -p "$(dirname "$out")"
 
-# Uma assinatura antiga nunca pode sobreviver a um binário novo.
-rm -f -- "$sig"
-
 tmp="$(mktemp "$out.XXXXXX")"
-trap 'rm -f -- "$tmp"' EXIT
+sig_tmp="$tmp.asc"
+cleanup() { rm -f -- "$tmp" "$sig_tmp"; }
+trap cleanup EXIT
+
 {
 	echo '#!/usr/bin/env bash'
 	echo '# GENERATED FILE - built by build.sh from lib/*.bash. Do not edit directly.'
@@ -50,40 +50,42 @@ trap 'rm -f -- "$tmp"' EXIT
 	done
 } >"$tmp"
 bash -n "$tmp"
-chmod +x "$tmp"
+chmod 755 "$tmp"
+
+if [[ $sign -eq 1 ]]; then
+	if ! command -v gpg >/dev/null 2>&1; then
+		echo "build.sh: gpg não encontrado; use --no-sign para gerar sem assinar." >&2
+		exit 1
+	fi
+
+	if [[ -z $key ]] && command -v git >/dev/null 2>&1; then
+		key="$(git config --get user.signingkey 2>/dev/null || true)"
+	fi
+
+	if [[ -z ${GPG_TTY:-} ]] && tty_path="$(tty 2>/dev/null)"; then
+		export GPG_TTY="$tty_path"
+	fi
+
+	gpg_args=(--batch --yes --armor --detach-sign --output "$sig_tmp")
+	[[ -n $key ]] && gpg_args+=(--local-user "$key")
+
+	if ! gpg "${gpg_args[@]}" "$tmp"; then
+		echo "build.sh: falha ao assinar o binário temporário." >&2
+		exit 1
+	fi
+	if ! gpg --verify "$sig_tmp" "$tmp" >/dev/null 2>&1; then
+		echo "build.sh: assinatura temporária não verifica." >&2
+		exit 1
+	fi
+fi
+
+# Só substitui os artefatos anteriores depois de build e assinatura válidos.
 mv -f -- "$tmp" "$out"
-echo "built: $out"
-
-if [[ $sign -eq 0 ]]; then
+if [[ $sign -eq 1 ]]; then
+	mv -f -- "$sig_tmp" "$sig"
+	echo "signed: $sig"
+else
+	rm -f -- "$sig"
 	echo "assinatura ignorada (--no-sign)"
-	exit 0
 fi
-
-if ! command -v gpg >/dev/null 2>&1; then
-	echo "build.sh: gpg não encontrado; use --no-sign para gerar sem assinar." >&2
-	exit 1
-fi
-
-if [[ -z $key ]] && command -v git >/dev/null 2>&1; then
-	key="$(git config --get user.signingkey 2>/dev/null || true)"
-fi
-
-if [[ -z ${GPG_TTY:-} ]] && tty_path="$(tty 2>/dev/null)"; then
-	export GPG_TTY="$tty_path"
-fi
-
-gpg_args=(--batch --yes --armor --detach-sign --output "$sig")
-[[ -n $key ]] && gpg_args+=(--local-user "$key")
-
-if ! gpg "${gpg_args[@]}" "$out"; then
-	rm -f -- "$sig"
-	echo "build.sh: falha ao assinar $out." >&2
-	exit 1
-fi
-
-if ! gpg --verify "$sig" "$out" >/dev/null 2>&1; then
-	rm -f -- "$sig"
-	echo "build.sh: a assinatura gerada não verifica." >&2
-	exit 1
-fi
-echo "signed: $sig"
+echo "built: $out"
