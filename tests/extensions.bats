@@ -101,3 +101,39 @@ load test_helper
   [ "${lines[0]}" = "audit import clip-x11|refused ok refused|assinatura_invalida  permissao" ]
   [ "${lines[1]}" = "0|1" ]
 }
+
+@test "clip-x11 na tela de extensões copia a senha sem exibir o conteúdo" {
+  MOCK_SESSION=x11 MOCK_DISPLAY=:99 MOCK_CLIP_ANSWER= run_tui_case ext-clip-x11
+  [ "$status" -eq 0 ]
+  assert_log_has 'clip-x11 personal example/login'
+}
+
+@test "clip-x11 aceita campo específico e documento inteiro" {
+  MOCK_SESSION=x11 MOCK_DISPLAY=:99 MOCK_CLIP_ANSWER=login run_tui_case ext-clip-x11
+  [ "$status" -eq 0 ]
+  assert_log_has 'clip-x11 login personal example/login'
+  MOCK_SESSION=x11 MOCK_DISPLAY=:99 MOCK_CLIP_ANSWER=all run_tui_case ext-clip-x11
+  [ "$status" -eq 0 ]
+  assert_log_has 'clip-x11 all personal example/login'
+}
+
+@test "clip-x11 não executa fora de uma sessão X11" {
+  MOCK_SESSION=wayland run_tui_case ext-clip-x11-no-session
+  [ "$status" -eq 0 ]
+  run grep -Eq '^clip-x11' "$LOG"
+  [ "$status" -ne 0 ]
+}
+
+@test "clip-x11 recusa nome de campo inválido sem chamar a extensão" {
+  MOCK_SESSION=x11 MOCK_DISPLAY=:99 MOCK_CLIP_ANSWER=--help run_tui_case ext-clip-x11
+  [ "$status" -eq 0 ]
+  run grep -Eq '^clip-x11' "$LOG"
+  [ "$status" -ne 0 ]
+}
+
+@test "clip-x11 recusada pelo npass nunca é executada pela ação explícita" {
+  MOCK_SESSION=x11 MOCK_DISPLAY=:99 MOCK_EXT_REFUSED=1 run_tui_case ext-clip-x11-refused
+  [ "$status" -eq 0 ]
+  run grep -Eq '^clip-x11' "$LOG"
+  [ "$status" -ne 0 ]
+}
