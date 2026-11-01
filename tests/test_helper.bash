@@ -80,7 +80,7 @@ case "$1" in
       printf '<!-- npass:md1 -->\n## Senha\nnot-a-real-secret\n'
     fi
     ;;
-  clip | clip-x11 | wclip)
+  clip | clip-x11 | xclip | wclip)
     if [[ ${MOCK_CLIP_FAIL:-0} == 1 ]]; then printf 'FAIL-SECRET-SENTINEL\n'; exit 17; fi
     exit 0
     ;;
