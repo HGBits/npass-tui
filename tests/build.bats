@@ -62,6 +62,7 @@ gpg_test_cleanup() {
 teardown() { gpg_test_cleanup; }
 
 @test "release.sh rejeita chave privada fora da raiz oficial" {
+  rm -f -- "$TUI" "$TUI.asc"
   gpg_test_key
   run env NPASS_RELEASE_SIGNING_KEY="$TEST_KEY" bash "$ROOT/release.sh"
   [ "$status" -ne 0 ]
