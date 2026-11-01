@@ -10,11 +10,35 @@ jobs:
     runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v6
-      - name: Install Bats
+      - name: Install Bats and GnuPG
         run: |
           sudo apt-get update
-          sudo apt-get install --yes bats
-      - name: Build bin/npass-tui
+          sudo apt-get install --yes bats gnupg
+      - name: Validate official trust root
+        run: |
+          set -euo pipefail
+          home="$(mktemp -d)"
+          chmod 700 "$home"
+          trap 'GNUPGHOME="$home" gpgconf --kill all >/dev/null 2>&1 || true; rm -rf "$home"' EXIT
+          GNUPGHOME="$home" gpg --batch --quiet --import packaging/npass-release.asc
+          count="$(GNUPGHOME="$home" gpg --batch --with-colons --list-keys | grep -c '^pub:' || true)"
+          fingerprint="$(GNUPGHOME="$home" gpg --batch --with-colons --list-keys | awk -F: '$1=="fpr"{print $10; exit}')"
+          test "$count" -eq 1
+          test "${#fingerprint}" -ge 40
+      - name: Reject a non-official signing key
+        run: |
+          set -euo pipefail
+          home="$(mktemp -d)"
+          chmod 700 "$home"
+          trap 'GNUPGHOME="$home" gpgconf --kill all >/dev/null 2>&1 || true; rm -rf "$home"' EXIT
+          GNUPGHOME="$home" gpg --batch --passphrase '' --quick-generate-key "NPASS CI rejection test <npass-ci@example.invalid>" ed25519 sign 1d
+          test_key="$(GNUPGHOME="$home" gpg --batch --with-colons --list-secret-keys | awk -F: '$1=="fpr"{print $10; exit}')"
+          if GNUPGHOME="$home" NPASS_RELEASE_SIGNING_KEY="$test_key" bash release.sh; then
+            echo "release.sh accepted a key outside the official trust root" >&2
+            exit 1
+          fi
+          test ! -e bin/npass-tui.asc
+      - name: Build bin/npass-tui without signing
         run: bash release.sh --no-sign
       - name: Check Bash syntax
         run: |
