@@ -38,6 +38,7 @@ ROWS=24
 COLS=80
 
 cleanup() {
+    [[ -n $WATCHER ]] && kill "$WATCHER" 2>/dev/null
     stty "$TTY_STATE" 2>/dev/null || true
     printf '%s%s%s%s' "$CNORM" "$SMAM" "$RESET" "$CLEAR"
 }
@@ -47,7 +48,44 @@ install_traps() {
     trap 'exit 130' INT
     trap 'exit 143' TERM
     trap 'exit 129' HUP
-    trap 'WINCH=1' WINCH
+    trap on_winch USR1
+    trap : WINCH
+    start_winch_watcher
+}
+
+# Live resize. bash defers a SIGWINCH trap until `read` returns (other signals
+# fire at once), and a polling `read -t` loses a key that lands as it expires.
+# So the input read blocks, and a tiny watcher process turns SIGWINCH (which the
+# kernel sends to the whole foreground group) into SIGUSR1 for the main shell;
+# that trap runs immediately even inside `read`. When the TUI is idle in
+# read_key the trap re-reads the size and repaints; anywhere else it only
+# raises WINCH and read_key reports it.
+IN_READ=0
+WATCHER=''
+on_winch() {
+    WINCH=1
+    (( IN_READ )) || return 0
+    WINCH=0
+    term_size
+    R_FULL=1
+    render
+}
+
+start_winch_watcher() {
+    local main=$$
+    (
+        sleeper=''
+        trap 'kill -USR1 '"$main"' 2>/dev/null' WINCH
+        trap '[[ -n $sleeper ]] && kill "$sleeper" 2>/dev/null; exit 0' TERM HUP INT
+        # Re-check the parent now and then so the watcher never outlives it.
+        while kill -0 "$main" 2>/dev/null; do
+            sleep 30 &
+            sleeper=$!
+            wait "$sleeper" 2>/dev/null
+            kill "$sleeper" 2>/dev/null
+        done
+    ) >/dev/null 2>&1 </dev/null &
+    WATCHER=$!
 }
 
 # TUI mode: no echo, cursor hidden, autowrap off. Whatever ran in cooked mode

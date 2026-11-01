@@ -2,19 +2,21 @@
 
 read_key() {
     local key seq rc
-    # Poll with a timeout so pending signal traps run even while the user is idle.
+    # A plain blocking read: bash drops a key that arrives just as `read -t`
+    # expires, so there is no polling timeout here. SIGINT/TERM/HUP exit through
+    # their traps; SIGWINCH repaints from its trap (see on_winch).
     while :; do
-        # SIGWINCH only sets WINCH; the main loop re-reads the size.
         if (( WINCH )); then WINCH=0; REPLY=resize; return; fi
-        if IFS= read -r -s -n 1 -t 0.2 key; then
+        IN_READ=1
+        if IFS= read -r -s -n 1 key; then
+            IN_READ=0
             break
         else
             rc=$?
+            IN_READ=0
         fi
-        # Bash read returns >128 on timeout; EOF or a closed terminal means quit.
-        if (( rc > 128 )); then
-            continue
-        fi
+        (( rc > 128 )) && continue
+        # EOF or a closed terminal means quit.
         REPLY=quit
         return
     done

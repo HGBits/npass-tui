@@ -60,12 +60,12 @@ class Session:
                     struct.pack("HHHH", rows, cols, 0, 0))
 
     def resize(self, rows, cols):
-        """Muda o tamanho do pty e avisa a TUI (sem terminal de controle, o
-        kernel não entrega SIGWINCH sozinho)."""
+        """Muda o tamanho do pty e avisa a TUI como o kernel faria: SIGWINCH para
+        o grupo de processos (sem terminal de controle ele não entrega sozinho)."""
         self.set_size(rows, cols)
         self.rows, self.cols = rows, cols
         self.screen.resize(rows, cols)
-        os.kill(self.proc.pid, signal.SIGWINCH)
+        os.killpg(self.proc.pid, signal.SIGWINCH)
 
     def tty_attrs(self):
         return termios.tcgetattr(self.master)
@@ -137,9 +137,11 @@ class Session:
 
     def close(self):
         os.close(self.master)
-        if self.proc.poll() is None:
-            self.proc.kill()
-            self.proc.wait()
+        try:
+            os.killpg(self.proc.pid, signal.SIGKILL)  # inclui o vigia de resize
+        except (ProcessLookupError, PermissionError):
+            pass
+        self.proc.wait()
 
 
 def flag_enabled(attrs, flag):
@@ -898,7 +900,34 @@ def sc_filter(s):
     quit_tui(s)
 
 
+def cursor_pos(screen):
+    m = re.search(r"ENTRADAS\s+(\d+)/", screen.text())
+    return int(m.group(1)) if m else -1
+
+
+def sc_input_no_loss(s):
+    """Nenhuma tecla pode se perder, nem a que chega junto do fim de um timeout
+    de leitura (o `read -t` do bash descartava teclas nessa fronteira)."""
+    s.deadline += 60
+    at_entries_many(s)
+    for ms in list(range(199, 207)) * 10:
+        # j sobe a seleção e k desce de volta: o par nunca chega ao fim da lista
+        before = cursor_pos(s.screen)
+        s.send("j")
+        s.wait_screen(lambda sc: cursor_pos(sc) == before + 1, "primeira tecla", timeout=2)
+        t0 = time.monotonic()
+        while time.monotonic() - t0 < ms / 1000:
+            pass
+        s.send("k")
+        try:
+            s.wait_screen(lambda sc: cursor_pos(sc) == before, "segunda tecla", timeout=1.0)
+        except TimeoutError:
+            raise Fail("tecla perdida %d ms depois da anterior" % ms)
+    quit_tui(s)
+
+
 SCENARIOS = {
+    "input-no-loss": sc_input_no_loss,
     "preview-protected": sc_preview_protected,
     "preview-scroll": sc_preview_scroll,
     "preview-otp-return": sc_preview_otp_return,
