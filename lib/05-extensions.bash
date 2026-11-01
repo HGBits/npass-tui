@@ -62,7 +62,8 @@ ext_load() {
             EXT_NAMES+=("${BASH_REMATCH[1]}") EXT_STATE+=(refused) EXT_WHY+=("${BASH_REMATCH[2]}") EXT_RAW+=("$line")
         else
             EXT_INFO+=("$line")
-        fi    done <<< "$output"
+        fi
+    done <<< "$output"
     EXT_LOADED=1
 }
 
