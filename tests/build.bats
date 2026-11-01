@@ -1,8 +1,8 @@
 #!/usr/bin/env bats
 load test_helper
 
-@test "build.sh gera bin/npass-tui executável, com sintaxe válida e autocontido" {
-  run bash "$ROOT/build.sh" --no-sign
+@test "release.sh gera bin/npass-tui executável, com sintaxe válida e autocontido" {
+  run bash "$ROOT/release.sh" --no-sign
   [ "$status" -eq 0 ]
   [ -x "$TUI" ]
   [ "$(head -n 1 "$TUI")" = '#!/usr/bin/env bash' ]
@@ -13,8 +13,8 @@ load test_helper
   [ "$status" -ne 0 ]
 }
 
-@test "build.sh inclui todas as libs em ordem, com 99-main por último" {
-  bash "$ROOT/build.sh" --no-sign >/dev/null
+@test "release.sh inclui todas as libs em ordem, com 99-main por último" {
+  bash "$ROOT/release.sh" --no-sign >/dev/null
   local prev=0 f marker line
   for f in "$ROOT"/lib/*.bash; do
     marker=$(grep -v '^[[:space:]]*$' "$f" | head -n 1)
@@ -35,7 +35,7 @@ load test_helper
 }
 
 @test "binário gerado roda copiado para fora do repositório" {
-  bash "$ROOT/build.sh" --no-sign >/dev/null
+  bash "$ROOT/release.sh" --no-sign >/dev/null
   install -Dm755 "$TUI" "$TMP/dest/bin/npass-tui"
   run env NPASS_BIN="$MOCK_NPASS" "$TMP/dest/bin/npass-tui" </dev/null
   [ "$status" -eq 1 ]
@@ -60,9 +60,9 @@ gpg_test_cleanup() {
 
 teardown() { gpg_test_cleanup; }
 
-@test "build.sh assina o binário com a chave informada e a assinatura verifica" {
+@test "release.sh assina o binário com a chave informada e a assinatura verifica" {
   gpg_test_key
-  run env NPASS_TUI_SIGN_KEY="$TEST_KEY" bash "$ROOT/build.sh"
+  run env NPASS_TUI_SIGN_KEY="$TEST_KEY" bash "$ROOT/release.sh"
   [ "$status" -eq 0 ]
   [ -s "$TUI.asc" ]
   head -n 1 "$TUI.asc" | grep -q 'BEGIN PGP SIGNATURE'
@@ -70,16 +70,16 @@ teardown() { gpg_test_cleanup; }
   [ "$status" -eq 0 ]
 }
 
-@test "build.sh --key tem precedência sobre NPASS_TUI_SIGN_KEY" {
+@test "release.sh --key tem precedência sobre NPASS_TUI_SIGN_KEY" {
   gpg_test_key
-  run env NPASS_TUI_SIGN_KEY=chave-que-nao-existe bash "$ROOT/build.sh" --key="$TEST_KEY"
+  run env NPASS_TUI_SIGN_KEY=chave-que-nao-existe bash "$ROOT/release.sh" --key="$TEST_KEY"
   [ "$status" -eq 0 ]
   [ -s "$TUI.asc" ]
 }
 
 @test "assinatura não verifica se o binário for alterado depois" {
   gpg_test_key
-  env NPASS_TUI_SIGN_KEY="$TEST_KEY" bash "$ROOT/build.sh" >/dev/null
+  env NPASS_TUI_SIGN_KEY="$TEST_KEY" bash "$ROOT/release.sh" >/dev/null
   echo '# adulterado' >>"$TUI"
   run gpg --verify "$TUI.asc" "$TUI"
   [ "$status" -ne 0 ]
@@ -87,12 +87,12 @@ teardown() { gpg_test_cleanup; }
 
 @test "falha ao assinar preserva o binário e a assinatura válidos anteriores" {
   gpg_test_key
-  env NPASS_TUI_SIGN_KEY="$TEST_KEY" bash "$ROOT/build.sh" >/dev/null
+  env NPASS_TUI_SIGN_KEY="$TEST_KEY" bash "$ROOT/release.sh" >/dev/null
   local old_bin old_sig
   old_bin="$(sha256sum "$TUI" | cut -d' ' -f1)"
   old_sig="$(sha256sum "$TUI.asc" | cut -d' ' -f1)"
 
-  run env NPASS_TUI_SIGN_KEY=chave-que-nao-existe bash "$ROOT/build.sh"
+  run env NPASS_TUI_SIGN_KEY=chave-que-nao-existe bash "$ROOT/release.sh"
   [ "$status" -ne 0 ]
   [[ $output == *"falha ao assinar"* ]]
   [ "$(sha256sum "$TUI" | cut -d' ' -f1)" = "$old_bin" ]
@@ -101,23 +101,22 @@ teardown() { gpg_test_cleanup; }
   [ "$status" -eq 0 ]
 }
 
-@test "build.sh --no-sign remove assinatura antiga em vez de deixá-la órfã" {
+@test "release.sh --no-sign remove assinatura antiga em vez de deixá-la órfã" {
   mkdir -p "$ROOT/bin"
   echo 'assinatura-velha' >"$TUI.asc"
-  run bash "$ROOT/build.sh" --no-sign
+  run bash "$ROOT/release.sh" --no-sign
   [ "$status" -eq 0 ]
   [ ! -e "$TUI.asc" ]
 }
 
-@test "build.sh rejeita opção desconhecida" {
-  run bash "$ROOT/build.sh" --nada
+@test "release.sh rejeita opção desconhecida" {
+  run bash "$ROOT/release.sh" --nada
   [ "$status" -ne 0 ]
   [[ $output == *"opção desconhecida"* ]]
 }
 
-@test "release.sh contém a implementação e build.sh só encaminha chamadas antigas" {
+@test "release.sh é o único entrypoint de build e build.sh não existe" {
   grep -Fq 'for f in lib/*.bash' "$ROOT/release.sh"
   grep -Fq 'gpg_args=(--batch --yes --armor --detach-sign' "$ROOT/release.sh"
-  grep -Fq 'exec "$ROOT/release.sh" "$@"' "$ROOT/build.sh"
-  ! grep -Fq 'for f in lib/*.bash' "$ROOT/build.sh"
+  [ ! -e "$ROOT/build.sh" ]
 }
