@@ -90,7 +90,7 @@ if [[ $sign -eq 1 ]]; then
 		echo "release.sh: nenhuma chave privada GPG encontrada." >&2
 		exit 1
 	}
-	secret_fpr="$(gpg --batch --with-colons --list-secret-keys "$key" 2>/dev/null | awk -F: '$1=="fpr"{print $10; exit}')"
+	secret_fpr="$(gpg --batch --with-colons --list-secret-keys "$key" 2>/dev/null | awk -F: '$1=="fpr"{print $10; exit}' || true)"
 	[[ -n "$secret_fpr" && "$secret_fpr" == "$expected_fpr" ]] || {
 		echo "release.sh: a chave privada selecionada não corresponde à chave pública oficial ($expected_fpr)." >&2
 		exit 1
