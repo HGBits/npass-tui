@@ -137,3 +137,10 @@ load test_helper
   run grep -Eq '^clip-x11' "$LOG"
   [ "$status" -ne 0 ]
 }
+
+@test "falha de clip-x11 não exibe a saída arbitrária da extensão" {
+  MOCK_SESSION=x11 MOCK_DISPLAY=:99 MOCK_CLIP_FAIL=1 run_tui_case ext-clip-x11
+  [ "$status" -eq 0 ]
+  run grep -Fq 'FAIL-SECRET-SENTINEL' "$PTY_OUT"
+  [ "$status" -ne 0 ]
+}
