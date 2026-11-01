@@ -101,24 +101,26 @@ case "$1" in
     printf 'OTP-SENTINEL-123456\n'
     ;;
   extension)
-    # Formato real do core (lib/11-extensions.bash): "nome: ok" ou "nome: recusada (motivo)".
-    if [[ ${MOCK_EXT_FAIL:-0} == 1 ]]; then printf 'FAIL-SECRET-SENTINEL\n'; exit 17; fi
+    if [[ ${2:-} != list ]]; then
+      case ${2:-} in
+        audit) printf "AUDIT-REPORT\\n"; exit "${MOCK_ACTION_EXIT:-0}" ;;
+        import) printf "IMPORT-DONE\\n"; exit "${MOCK_ACTION_EXIT:-0}" ;;
+        clip-x11)
+          if [[ ${MOCK_CLIP_FAIL:-0} == 1 ]]; then printf "FAIL-SECRET-SENTINEL\\n"; exit 17; fi
+          exit 0 ;;
+        *) exit 90 ;;
+      esac
+    fi
+    # Formato real do core: nome logico sem prefixo de artefato.
+    if [[ ${MOCK_EXT_FAIL:-0} == 1 ]]; then printf "FAIL-SECRET-SENTINEL\\n"; exit 17; fi
     if [[ ${MOCK_EXT_EMPTY:-0} == 1 ]]; then exit 0; fi
-    if [[ ${MOCK_EXT_CONTROL:-0} == 1 ]]; then
-      printf 'safe-ext\033]0;PWNED-EXT\007\033[?9999h\n'
-      exit 0
-    fi
-    if [[ ${MOCK_EXT_NODIR:-0} == 1 ]]; then
-      printf 'Nenhum diretório de extensões encontrado: /usr/local/share/npass/extensions /usr/share/npass/extensions\n'
-      exit 0
-    fi
-    if [[ ${MOCK_EXT_ODD:-0} == 1 ]]; then printf 'zzz: ok\n'; exit 0; fi
-    if [[ ${MOCK_EXT_NOCLIP:-0} == 1 ]]; then printf 'audit: ok\nimport: ok\n'; exit 0; fi
-    if [[ ${MOCK_EXT_REFUSED:-0} == 1 ]]; then
-      printf 'audit: recusada (assinatura_invalida)\nimport: ok\nclip-x11: recusada (permissao)\n'
-      exit 0
-    fi
-    printf 'audit: ok\nimport: ok\nclip-x11: ok\npasskey: ok\n'
+    if [[ ${MOCK_EXT_CONTROL:-0} == 1 ]]; then printf "safe-ext\\033]0;PWNED-EXT\\007\\033[?9999h\\n"; exit 0; fi
+    if [[ ${MOCK_EXT_NODIR:-0} == 1 ]]; then printf "Nenhum diretório de extensões encontrado: /usr/local/share/npass/extensions /usr/share/npass/extensions\\n"; exit 0; fi
+    if [[ ${MOCK_EXT_ODD:-0} == 1 ]]; then printf "zzz: ok\\n"; exit 0; fi
+    if [[ ${MOCK_EXT_PREFIXED:-0} == 1 ]]; then printf "npass-audit: ok\\n"; exit 0; fi
+    if [[ ${MOCK_EXT_NOCLIP:-0} == 1 ]]; then printf "audit: ok\\nimport: ok\\n"; exit 0; fi
+    if [[ ${MOCK_EXT_REFUSED:-0} == 1 ]]; then printf "audit: recusada (assinatura_invalida)\\nimport: ok\\nclip-x11: recusada (permissao)\\n"; exit 0; fi
+    printf "audit: ok\\nimport: ok\\nclip-x11: ok\\npasskey: ok\\n"
     ;;
   *) printf 'unexpected command: %s\n' "$1" >&2; exit 90 ;;
 esac
@@ -143,6 +145,14 @@ run_tui() {
     MOCK_OTP_FAIL="${MOCK_OTP_FAIL:-0}" \
     MOCK_ACTION_EXIT="${MOCK_ACTION_EXIT:-0}" \
     MOCK_VERSION="${MOCK_VERSION:-2.8}" \
+    XDG_SESSION_TYPE="${MOCK_SESSION:-wayland}" DISPLAY="${MOCK_DISPLAY:-}" \
+    MOCK_CLIP_ANSWER="${MOCK_CLIP_ANSWER:-}" \
+    MOCK_AUDIT_ANSWER="${MOCK_AUDIT_ANSWER:-}" \
+    MOCK_CLIP_OVERRIDE="${MOCK_CLIP_OVERRIDE:-}" \
+    MOCK_EXT_REFUSED="${MOCK_EXT_REFUSED:-0}" MOCK_EXT_PREFIXED="${MOCK_EXT_PREFIXED:-0}" \
+    MOCK_EXT_FAIL="${MOCK_EXT_FAIL:-0}" MOCK_EXT_EMPTY="${MOCK_EXT_EMPTY:-0}" \
+    MOCK_EXT_CONTROL="${MOCK_EXT_CONTROL:-0}" MOCK_EXT_NODIR="${MOCK_EXT_NODIR:-0}" \
+    MOCK_EXT_ODD="${MOCK_EXT_ODD:-0}" MOCK_EXT_NOCLIP="${MOCK_EXT_NOCLIP:-0}" \
     python3 "$ROOT/tests/pty_driver.py" "$scenario" "$TUI" \
     >"$PTY_OUT" 2>&1; then
     cat "$PTY_OUT" >&2

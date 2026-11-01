@@ -46,6 +46,8 @@ class Session:
         env["XDG_SESSION_TYPE"] = os.environ.get("MOCK_SESSION", "wayland")
         for var in ("DISPLAY", "WAYLAND_DISPLAY", "NPASS_TUI_CLIP"):
             env.pop(var, None)
+        if os.environ.get("MOCK_SESSION") == "x11" and os.environ.get("MOCK_DISPLAY"):
+            env["DISPLAY"] = os.environ["MOCK_DISPLAY"]
         if os.environ.get("MOCK_CLIP_OVERRIDE"):
             env["NPASS_TUI_CLIP"] = os.environ["MOCK_CLIP_OVERRIDE"]
         env.pop("LINES", None)
@@ -1162,14 +1164,10 @@ def sc_extensions_odd(s):
 
 def sc_ext_no_action(s):
     ext_screen(s)
-    s.send("jj")
-    s.wait_text("> clip-x11")
-    s.send("\r")
-    s.wait_text("Usada pelo menu Copiar em sessões X11")
-    s.send("j")
+    s.send("jjjj")
     s.wait_text("> passkey")
     s.send("\r")
-    s.wait_text("Sem ação na TUI. Use na CLI: npass passkey.")
+    s.wait_text("Sem ação na TUI. Use na CLI: npass extension passkey.")
     s.send("q")
     wait_entries(s)
     quit_tui(s)
@@ -1224,6 +1222,67 @@ def sc_ext_audit_identity(s):
     need(selected_rows(s.screen) == [4], "a seleção de identidade se perdeu")
     s.send("q")
     check_clean_exit(s, "ext-audit-identity")
+
+
+def sc_ext_clip_x11(s):
+    ext_screen(s)
+    s.send("jj")
+    s.wait_text("> clip-x11", "copia a senha ou um campo")
+    s.send("\r")
+    s.read_until("Campo (vazio = senha")
+    answer = os.environ.get("MOCK_CLIP_ANSWER", "")
+    s.send(answer + "\n")
+    if answer.startswith("-"):
+        s.wait_text("Nome de campo inválido.")
+    elif os.environ.get("MOCK_CLIP_FAIL") == "1":
+        s.wait_text("clip-x11 falhou (código 17).")
+        need(not s.raw_has(FAIL_SENTINEL), "saída arbitrária da extensão chegou ao terminal")
+    elif not answer:
+        s.wait_text("Copiado via clip-x11: senha")
+    else:
+        s.wait_text("Copiado via clip-x11:")
+    need(not s.screen.has("not-a-real-secret"), "conteúdo da entrada apareceu na tela")
+    s.send("q")
+    wait_entries(s)
+    quit_tui(s)
+
+
+def sc_ext_clip_x11_without_entry(s):
+    wait_identities(s)
+    s.send("x")
+    s.wait_text("EXTENSÕES", "> audit")
+    s.send("jj")
+    s.wait_text("> clip-x11")
+    s.send("\r")
+    s.wait_text("Abra uma entrada antes de usar clip-x11.")
+    need(not any(line.startswith("extension clip-x11 ") for line in open(os.environ["NPASS_LOG"])), "clip-x11 executada sem entrada")
+    s.send("q")
+    wait_identities(s)
+    quit_tui(s)
+
+
+def sc_ext_clip_x11_no_session(s):
+    ext_screen(s)
+    s.send("jj")
+    s.wait_text("> clip-x11")
+    s.send("\r")
+    s.wait_text("clip-x11 requer uma sessão X11 ativa (DISPLAY).")
+    need(not any(line.startswith("extension clip-x11 ") for line in open(os.environ["NPASS_LOG"])), "extensão executada fora do X11")
+    s.send("q")
+    wait_entries(s)
+    quit_tui(s)
+
+
+def sc_ext_clip_x11_refused(s):
+    ext_screen(s)
+    s.send("jj")
+    s.wait_text("> clip-x11  (recusada)")
+    s.send("\r")
+    s.wait_text("clip-x11 foi recusada pelo npass")
+    need(not any(line.startswith("extension clip-x11 ") for line in open(os.environ["NPASS_LOG"])), "extensão recusada foi executada")
+    s.send("q")
+    wait_entries(s)
+    quit_tui(s)
 
 
 def import_file():
@@ -1339,6 +1398,10 @@ SCENARIOS = {
     "ext-audit": sc_ext_audit,
     "ext-audit-fail": sc_ext_audit_fail,
     "ext-audit-identity": sc_ext_audit_identity,
+    "ext-clip-x11": sc_ext_clip_x11,
+    "ext-clip-x11-no-session": sc_ext_clip_x11_no_session,
+    "ext-clip-x11-without-entry": sc_ext_clip_x11_without_entry,
+    "ext-clip-x11-refused": sc_ext_clip_x11_refused,
     "ext-import": sc_ext_import,
     "ext-import-invalid": sc_ext_import_invalid,
     "input-no-loss": sc_input_no_loss,
