@@ -107,6 +107,12 @@ case "$1" in
       printf 'safe-ext\033]0;PWNED-EXT\007\033[?9999h\n'
       exit 0
     fi
+    case ${MOCK_EXT_FORMAT:-} in
+      bullets) printf 'Extensões instaladas:\n  • audit — audita senhas\n  ✓ import (v0.1.0)\n'; exit 0 ;;
+      ansi) printf '\033[1;32m●\033[0m \033[1maudit\033[0m  0.1.0\n\033[1;32m●\033[0m \033[1mimport\033[0m  0.1.0\n'; exit 0 ;;
+      paths) printf '/usr/lib/npass/extensions/npass-audit\n/usr/lib/npass/extensions/npass-import.bash\n'; exit 0 ;;
+      table) printf 'NOME      VERSÃO  DESCRIÇÃO\naudit     0.1.0   Audita senhas\nimport    0.1.0   Importa senhas\n'; exit 0 ;;
+    esac
     if [[ ${MOCK_EXT_ODD:-0} == 1 ]]; then
       printf 'Instaladas:\nnpass-zzz  1.0\n'
       exit 0

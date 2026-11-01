@@ -1153,7 +1153,7 @@ def sc_extensions_odd(s):
     s.send("x")
     s.wait_text("EXTENSÕES", "Instaladas:", "zzz")
     s.send("\r")
-    s.wait_text("Sem ação na TUI para esta extensão.")
+    s.wait_text("Sem ação na TUI para instaladas.")
     s.send("j")
     s.wait_text("> zzz")
     s.send("\r")
@@ -1294,7 +1294,29 @@ def sc_ext_import_invalid(s):
         os.unlink(path)
 
 
+def sc_extensions_format(s):
+    """Qualquer formato razoável de `extension list` precisa dar ação a audit e import."""
+    wait_identities(s)
+    s.send("x")
+    s.wait_text("EXTENSÕES")
+    # a primeira linha pode ser um cabeçalho; procura o audit descendo a lista
+    for _ in range(4):
+        if "Audita as senhas" in s.screen.text():
+            break
+        s.send("j")
+        s.settle(0.1)
+    need("Audita as senhas" in s.screen.text(), "audit não foi reconhecido: %s" % s.screen.text())
+    need("Enter audita a identidade" in s.screen.text(), "audit sem a ação da TUI")
+    s.send("j")
+    s.wait_text("Importa senhas", "Enter importa um arquivo")
+    s.send("q")
+    wait_identities(s)
+    s.send("q")
+    check_clean_exit(s, "extensions-format")
+
+
 SCENARIOS = {
+    "extensions-format": sc_extensions_format,
     "copy-backend-note": sc_copy_backend_note,
     "copy-no-note": sc_copy_no_note,
     "copy-x11-missing": sc_copy_x11_missing,

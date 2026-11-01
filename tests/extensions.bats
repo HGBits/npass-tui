@@ -78,3 +78,20 @@ load test_helper
   run grep -Eq '^import' "$LOG"
   [ "$status" -ne 0 ]
 }
+
+@test "formatos variados de extension list (bullets, cores, caminhos, tabela) acham audit e import" {
+  for fmt in bullets ansi paths table; do
+    MOCK_EXT_FORMAT=$fmt run_tui_case extensions-format
+    if (( status != 0 )); then echo "formato: $fmt" >&2; fi
+    [ "$status" -eq 0 ]
+  done
+}
+
+@test "nome da extensão sai de linhas como npass-audit, audit.bash, caminhos e bullets" {
+  run bash -c "source '$ROOT/lib/00-core.bash' 2>/dev/null; source '$ROOT/lib/05-extensions.bash'
+    for l in 'npass-audit  0.1.0' 'audit - Audita' '* audit' '[ok] npass-audit' '/usr/lib/npass/extensions/npass-audit' 'npass-import.bash' 'clip-x11 (xclip)' 'npass-clip-x11.bash' '  ● passkey'; do
+      ext_name_of \"\$l\"; printf '%s\\n' \"\$EXT_FOUND\"
+    done"
+  [ "$status" -eq 0 ]
+  [ "$output" = "$(printf 'audit\naudit\naudit\naudit\naudit\nimport\nclip-x11\nclip-x11\npasskey')" ]
+}

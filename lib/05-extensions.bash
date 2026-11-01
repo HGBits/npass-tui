@@ -4,7 +4,8 @@
 #   - the copy menu picks the clipboard backend (clip, or clip-x11 on X11);
 #   - the Extensions screen (X) runs the ones that have a TUI action.
 
-EXT_NAMES=()      # short name per listed extension ("" when the line is not a plain name)
+EXT_NAMES=()      # short name per listed extension ("" when no word looks like one)
+EXT_FOUND=''
 EXT_RAW=()        # the line as `npass extension list` printed it
 EXT_CURSOR=0
 EXT_LOADED=0
@@ -28,19 +29,43 @@ declare -A EXT_USE=(
     [wclip]='Usada pelo menu Copiar com NPASS_TUI_CLIP=wclip, sem ação aqui.'
 )
 
+# Short name of the extension a `npass extension list` line talks about, in
+# EXT_FOUND. The core's format is not fixed here, so be lenient: the line is
+# split into words (anything but letters, digits and "-" separates), and the
+# first word that is a known extension wins ("npass-audit", "audit.bash",
+# "/usr/lib/npass/extensions/npass-audit", "* audit - ..." and "[ok] audit"
+# all give "audit"). Without a known one, the first plain word is used.
+ext_name_of() {
+    local words=${1//[^A-Za-z0-9-]/ } word first=''
+    EXT_FOUND=''
+    set -f
+    for word in $words; do
+        word=${word,,}
+        word=${word#npass-}
+        [[ $word == bash ]] && continue
+        if [[ -n ${EXT_DESC[$word]+x} ]]; then
+            EXT_FOUND=$word
+            set +f
+            return 0
+        fi
+        [[ -z $first && $word =~ ^[a-z][a-z0-9-]{0,31}$ ]] && first=$word
+    done
+    set +f
+    EXT_FOUND=$first
+}
+
 # Fills EXT_NAMES/EXT_RAW from `npass extension list`. Returns 1, with the exit
 # code in EXT_RC, when the command is not available.
 ext_load() {
-    local output line first
+    local output line
     output=$("$NPASS_BIN" extension list 2>&1) || { EXT_RC=$?; return 1; }
+    output=$(sanitize_text "$output")
     EXT_NAMES=() EXT_RAW=()
     while IFS= read -r line; do
         line=${line#"${line%%[![:space:]]*}"}
         [[ -n $line ]] || continue
-        first=${line%%[[:space:]]*}
-        first=${first#npass-}
-        [[ $first =~ ^[a-z][a-z0-9-]{0,31}$ ]] || first=''
-        EXT_NAMES+=("$first")
+        ext_name_of "$line"
+        EXT_NAMES+=("$EXT_FOUND")
         EXT_RAW+=("$line")
     done <<< "$output"
     EXT_LOADED=1
