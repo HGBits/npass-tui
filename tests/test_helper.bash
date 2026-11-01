@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
 
 # Garante um bin/npass-tui atual. bin/ está no .gitignore, então num clone novo
-# ele não existe até alguém rodar ./build.sh. Reconstrói também se algum
-# lib/*.bash ou o build.sh for mais novo que o binário gerado.
+# ele não existe até alguém rodar ./release.sh. Reconstrói também se algum
+# lib/*.bash ou o release.sh for mais novo que o binário gerado.
 tui_test_build() {
   local stale=0 f
   if [[ ! -x $TUI ]]; then
     stale=1
   else
-    for f in "$ROOT"/lib/*.bash "$ROOT/build.sh"; do
+    for f in "$ROOT"/lib/*.bash "$ROOT/release.sh"; do
       [[ $f -nt $TUI ]] && { stale=1; break; }
     done
   fi
   (( stale )) || return 0
-  bash "$ROOT/build.sh" --no-sign >/dev/null
+  bash "$ROOT/release.sh" --no-sign >/dev/null
 }
 
 setup() {

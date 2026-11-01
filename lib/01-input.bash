@@ -6,8 +6,16 @@ read_key() {
     # expires, so there is no polling timeout here. SIGINT/TERM/HUP exit through
     # their traps; SIGWINCH repaints from its trap (see on_winch).
     while :; do
-        if (( WINCH )); then WINCH=0; REPLY=resize; return; fi
+        # Arm the read before checking WINCH. If SIGWINCH lands between the
+        # check and IN_READ=1, the trap only sets WINCH and the blocking read
+        # would otherwise wait forever without processing the resize.
         IN_READ=1
+        if (( WINCH )); then
+            IN_READ=0
+            WINCH=0
+            REPLY=resize
+            return
+        fi
         if IFS= read -r -s -n 1 key; then
             IN_READ=0
             break

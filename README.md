@@ -13,7 +13,7 @@ Não depende de Python, `dialog`, `fzf` ou `gum`.
 
 ## Estrutura
 
-O código-fonte fica em `lib/*.bash`. `release.sh` concatena os arquivos, em ordem, no
+O código-fonte fica em `lib/*.bash`. `release.sh` contém a lógica de build e assinatura: concatena os arquivos, em ordem, no
 executável único `bin/npass-tui` (no `.gitignore`), do mesmo modo que o npass-store gera `bin/npass`,
 e assina o resultado com GPG (`bin/npass-tui.asc`).
 O binário gerado não procura `lib/` em tempo de execução: pode ser copiado para qualquer lugar.
@@ -25,7 +25,7 @@ lib/02-backend.bash # contrato com a CLI npass (versão, identidades, caminhos)
 lib/03-render.bash  # layout, renderização incremental (paint), painéis Explorer/Contexto
 lib/04-actions.bash # ações do usuário (clip, otp, insert, edit, rm, filtro)
 lib/99-main.bash    # checagens de ambiente, loop principal e ponto de entrada (sempre por último)
-release.sh          # lib/*.bash -> bin/npass-tui + bin/npass-tui.asc (assinatura GPG)
+release.sh          # lógica de build e assinatura GPG
 ```
 
 Não há `install.sh`: o build gera e assina o binário, e instalar é copiá-lo.
