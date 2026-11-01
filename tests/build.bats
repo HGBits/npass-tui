@@ -42,7 +42,8 @@ load test_helper
   [[ $output == *"execute em um terminal interativo"* ]]
 }
 
-# Chave GPG descartável, num GNUPGHOME próprio: nunca toca o chaveiro real.
+# Chave GPG descartável para testar a rejeição de identidades que não
+# pertencem à raiz oficial. Nunca toca o chaveiro real.
 gpg_test_key() {
   export GNUPGHOME
   GNUPGHOME="$(mktemp -d /tmp/npass-tui-gpg.XXXXXX)"
@@ -60,45 +61,49 @@ gpg_test_cleanup() {
 
 teardown() { gpg_test_cleanup; }
 
-@test "release.sh assina o binário com a chave informada e a assinatura verifica" {
+@test "release.sh rejeita chave privada fora da raiz oficial" {
+  rm -f -- "$TUI" "$TUI.asc"
   gpg_test_key
-  run env NPASS_TUI_SIGN_KEY="$TEST_KEY" bash "$ROOT/release.sh"
-  [ "$status" -eq 0 ]
-  [ -s "$TUI.asc" ]
-  head -n 1 "$TUI.asc" | grep -q 'BEGIN PGP SIGNATURE'
-  run gpg --verify "$TUI.asc" "$TUI"
-  [ "$status" -eq 0 ]
+  run env NPASS_RELEASE_SIGNING_KEY="$TEST_KEY" bash "$ROOT/release.sh"
+  [ "$status" -ne 0 ]
+  [[ $output == *"não corresponde à chave pública oficial"* ]]
+  [ ! -e "$TUI" ]
+  [ ! -e "$TUI.asc" ]
 }
 
-@test "release.sh --key tem precedência sobre NPASS_TUI_SIGN_KEY" {
+@test "release.sh --key tem precedência sobre NPASS_RELEASE_SIGNING_KEY" {
   gpg_test_key
-  run env NPASS_TUI_SIGN_KEY=chave-que-nao-existe bash "$ROOT/release.sh" --key="$TEST_KEY"
-  [ "$status" -eq 0 ]
-  [ -s "$TUI.asc" ]
+  run env NPASS_RELEASE_SIGNING_KEY="$TEST_KEY" bash "$ROOT/release.sh" --key=chave-que-nao-existe
+  [ "$status" -ne 0 ]
+  [[ $output == *"não corresponde à chave pública oficial"* || $output == *"nenhuma chave privada GPG encontrada"* ]]
 }
 
-@test "assinatura não verifica se o binário for alterado depois" {
+@test "assinatura GPG não verifica se o arquivo for alterado depois" {
   gpg_test_key
-  env NPASS_TUI_SIGN_KEY="$TEST_KEY" bash "$ROOT/release.sh" >/dev/null
-  echo '# adulterado' >>"$TUI"
-  run gpg --verify "$TUI.asc" "$TUI"
+  local file="$TMP/signed-artifact"
+  printf 'artefato original\n' >"$file"
+  gpg --batch --yes --armor --detach-sign --local-user "$TEST_KEY" --output "$file.asc" "$file"
+  run gpg --verify "$file.asc" "$file"
+  [ "$status" -eq 0 ]
+  echo '# adulterado' >>"$file"
+  run gpg --verify "$file.asc" "$file"
   [ "$status" -ne 0 ]
 }
 
-@test "falha ao assinar preserva o binário e a assinatura válidos anteriores" {
+@test "rejeitar chave não oficial preserva os artefatos anteriores" {
   gpg_test_key
-  env NPASS_TUI_SIGN_KEY="$TEST_KEY" bash "$ROOT/release.sh" >/dev/null
+  mkdir -p "$ROOT/bin"
+  printf 'binário anterior\n' >"$TUI"
+  printf 'assinatura anterior\n' >"$TUI.asc"
   local old_bin old_sig
   old_bin="$(sha256sum "$TUI" | cut -d' ' -f1)"
   old_sig="$(sha256sum "$TUI.asc" | cut -d' ' -f1)"
 
-  run env NPASS_TUI_SIGN_KEY=chave-que-nao-existe bash "$ROOT/release.sh"
+  run env NPASS_RELEASE_SIGNING_KEY="$TEST_KEY" bash "$ROOT/release.sh"
   [ "$status" -ne 0 ]
-  [[ $output == *"falha ao assinar"* ]]
+  [[ $output == *"não corresponde à chave pública oficial"* ]]
   [ "$(sha256sum "$TUI" | cut -d' ' -f1)" = "$old_bin" ]
   [ "$(sha256sum "$TUI.asc" | cut -d' ' -f1)" = "$old_sig" ]
-  run gpg --verify "$TUI.asc" "$TUI"
-  [ "$status" -eq 0 ]
 }
 
 @test "release.sh --no-sign remove assinatura antiga em vez de deixá-la órfã" {
@@ -117,6 +122,6 @@ teardown() { gpg_test_cleanup; }
 
 @test "release.sh é o único entrypoint de build e build.sh não existe" {
   grep -Fq 'for f in lib/*.bash' "$ROOT/release.sh"
-  grep -Fq 'gpg_args=(--batch --yes --armor --detach-sign' "$ROOT/release.sh"
+  grep -Fq -- '--armor --detach-sign' "$ROOT/release.sh"
   [ ! -e "$ROOT/build.sh" ]
 }
