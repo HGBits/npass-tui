@@ -1226,6 +1226,51 @@ def sc_ext_audit_identity(s):
     check_clean_exit(s, "ext-audit-identity")
 
 
+def sc_ext_clip_x11(s):
+    ext_screen(s)
+    s.send("jj")
+    s.wait_text("> clip-x11", "copia a senha ou um campo")
+    s.send("\\r")
+    s.read_until("Campo (vazio = senha")
+    answer = os.environ.get("MOCK_CLIP_ANSWER", "")
+    s.send(answer + "\\n")
+    if answer.startswith("-") or not answer:
+        if answer.startswith("-"):
+            s.wait_text("Nome de campo inválido.")
+        else:
+            s.wait_text("Copiado via clip-x11: senha")
+    else:
+        s.wait_text("Copiado via clip-x11:")
+    need(not s.screen.has("not-a-real-secret"), "conteúdo da entrada apareceu na tela")
+    s.send("q")
+    wait_entries(s)
+    quit_tui(s)
+
+
+def sc_ext_clip_x11_no_session(s):
+    ext_screen(s)
+    s.send("jj")
+    s.wait_text("> clip-x11")
+    s.send("\\r")
+    s.wait_text("clip-x11 requer uma sessão X11 ativa (DISPLAY).")
+    need(not any(line.startswith("clip-x11 ") for line in open(os.environ["NPASS_LOG"])), "extensão executada fora do X11")
+    s.send("q")
+    wait_entries(s)
+    quit_tui(s)
+
+
+def sc_ext_clip_x11_refused(s):
+    ext_screen(s)
+    s.send("jj")
+    s.wait_text("> clip-x11  (recusada)")
+    s.send("\\r")
+    s.wait_text("clip-x11 foi recusada pelo npass")
+    need(not any(line.startswith("clip-x11 ") for line in open(os.environ["NPASS_LOG"])), "extensão recusada foi executada")
+    s.send("q")
+    wait_entries(s)
+    quit_tui(s)
+
+
 def import_file():
     import tempfile
     handle = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
@@ -1338,7 +1383,7 @@ SCENARIOS = {
     "ext-no-action": sc_ext_no_action,
     "ext-audit": sc_ext_audit,
     "ext-audit-fail": sc_ext_audit_fail,
-    "ext-audit-identity": sc_ext_audit_identity,
+    "ext-audit-identity": sc_ext_audit_identity,\n    "ext-clip-x11": sc_ext_clip_x11,\n    "ext-clip-x11-no-session": sc_ext_clip_x11_no_session,\n    "ext-clip-x11-refused": sc_ext_clip_x11_refused,
     "ext-import": sc_ext_import,
     "ext-import-invalid": sc_ext_import_invalid,
     "input-no-loss": sc_input_no_loss,
