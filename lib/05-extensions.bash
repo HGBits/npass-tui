@@ -99,7 +99,7 @@ session_is_x11() {
 clip_backend() {
     CLIP_CMD=clip CLIP_NOTE=''
     case ${NPASS_TUI_CLIP:-} in
-        clip | xclip | wclip
+        clip | xclip | wclip)
             CLIP_CMD=$NPASS_TUI_CLIP
             CLIP_NOTE="$CLIP_CMD (NPASS_TUI_CLIP)"
             return ;;
