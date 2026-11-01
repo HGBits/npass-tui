@@ -93,15 +93,14 @@ session_is_x11() {
     [[ -z ${WAYLAND_DISPLAY:-} && -n ${DISPLAY:-} ]]
 }
 
-# Chooses what "copy" calls. NPASS_TUI_CLIP=clip|xclip|wclip (clip-x11 is accepted as a legacy alias) forces it. On an
+# Chooses what "copy" calls. NPASS_TUI_CLIP=clip|xclip|wclip forces it. On an
 # X11 session the core clip (Wayland) does not work, so clip-x11 is used when
 # the extension is installed; its command line matches `clip`.
 clip_backend() {
     CLIP_CMD=clip CLIP_NOTE=''
     case ${NPASS_TUI_CLIP:-} in
-        clip | xclip | clip-x11 | wclip)
+        clip | xclip | wclip
             CLIP_CMD=$NPASS_TUI_CLIP
-            [[ $CLIP_CMD == clip-x11 ]] && CLIP_CMD=xclip
             CLIP_NOTE="$CLIP_CMD (NPASS_TUI_CLIP)"
             return ;;
     esac
