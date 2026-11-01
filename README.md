@@ -103,7 +103,8 @@ NPASS_BIN="$HOME/.local/bin/npass" ./bin/npass-tui
 - `x`: Extensões instaladas (`npass extension list`), com descrição. `Enter` executa as que têm ação na TUI:
   - **audit**: pergunta `s` (HIBP online) ou `o` (offline) e roda `npass extension audit ID [--offline]`
   - **import**: pergunta formato e arquivo, pede `sim` e roda `npass extension import FORMATO ID ARQUIVO`; depois recarrega a lista
-  - **clip-x11**: exige uma entrada selecionada e uma sessão X11 ativa; pergunta o campo (vazio = senha, `all` = documento inteiro) e copia sem exibir o valor.\n  - **passkey** e **wclip**: sem ação explícita na TUI (passkey pela CLI; wclip é usado pelo menu Copiar quando configurado).
+  - **clip-x11**: exige uma entrada selecionada e uma sessão X11 ativa; pergunta o campo (vazio = senha, `all` = documento inteiro) e copia sem exibir o valor.
+  - **passkey** e **wclip**: sem ação explícita na TUI (passkey pela CLI; wclip é usado pelo menu Copiar quando configurado).
 - `a`: criar entrada, informando o caminho; o próprio `npass insert` solicita a senha duas vezes sem eco e confirma antes de sobrescrever
 - `e`: editar a entrada selecionada com `npass edit` e o editor definido em `$EDITOR`
 - `d`: excluir a entrada selecionada; exige digitar `sim`, avisa sobre anexos de backup e mantém a confirmação nativa do `npass rm`
