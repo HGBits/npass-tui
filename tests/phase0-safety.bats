@@ -12,14 +12,6 @@ load test_helper
   [ "$status" -eq 0 ]
 }
 
-@test "OTP fica no preview explícito, não no status nem no log de argumentos" {
-  run_tui_case otp-secret
-  [ "$status" -eq 0 ]
-  assert_log_has 'otp personal example/login'
-  run grep -Fq 'OTP-SENTINEL-123456' "$LOG"
-  [ "$status" -ne 0 ]
-}
-
 @test "falha ao listar identidades não exibe texto arbitrário da CLI" {
   MOCK_IDENTITIES_FAIL=1 run_tui_case identities-fail
   [ "$status" -eq 0 ]
@@ -47,10 +39,10 @@ load test_helper
   assert_log_has 'clip personal example/login'
 }
 
-@test "falha no OTP não expõe o código nem a saída da CLI no status" {
-  MOCK_OTP_FAIL=1 run_tui_case otp-fail-secret
+@test "falha ao copiar o OTP não expõe a saída da CLI no status" {
+  MOCK_OTP_FAIL=1 run_tui_case copy-otp-fail
   [ "$status" -eq 0 ]
-  assert_log_has 'otp personal example/login'
+  assert_log_has 'otp clip personal example/login'
 }
 
 @test "SIGINT restaura o terminal e mostra o cursor" {

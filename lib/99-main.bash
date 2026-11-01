@@ -23,6 +23,7 @@ main_loop() {
         if (( TOO_SMALL )) && [[ $REPLY != quit ]]; then continue; fi
         case $SCREEN:$REPLY in
             identities:quit) break ;;
+            identities:extensions|entries:extensions) open_extensions ;;
             identities:up) (( CURSOR > 0 )) && ((CURSOR--)) ;;
             identities:down) (( CURSOR + 1 < ${#IDENTITIES[@]} )) && ((CURSOR++)) ;;
             identities:enter)
@@ -47,16 +48,20 @@ main_loop() {
                     run_interactive_npass rm "$REPLY"
                 fi ;;
             entries:enter) if (( ${#VISIBLE[@]} > 0 )); then open_preview "${VISIBLE[CURSOR]}"; fi ;;
-            entries:clip) if (( ${#VISIBLE[@]} > 0 )); then run_action clip "${VISIBLE[CURSOR]}"; fi ;;
-            entries:otp) if (( ${#VISIBLE[@]} > 0 )); then run_action otp "${VISIBLE[CURSOR]}"; fi ;;
+            entries:clip) if (( ${#VISIBLE[@]} > 0 )); then open_copy_menu "${VISIBLE[CURSOR]}"; fi ;;
             preview:quit|preview:back) close_preview ;;
             preview:reveal)
                 if (( PREVIEW_REVEAL )); then PREVIEW_REVEAL=0 PREVIEW_OFFSET=0; else PREVIEW_REVEAL=1; fi ;;
             preview:up) (( PREVIEW_REVEAL && PREVIEW_OFFSET > 0 )) && ((PREVIEW_OFFSET--)) ;;
             preview:down) (( PREVIEW_REVEAL && PREVIEW_OFFSET + BODY_H < ${#PREVIEW_LINES[@]} )) && ((PREVIEW_OFFSET++)) ;;
-            preview:clip) run_action clip "${VISIBLE[CURSOR]}" ;;
-            preview:otp) run_action otp "${VISIBLE[CURSOR]}" ;;
-            otp:*) SCREEN=$OTP_RETURN; OTP_LINES=() ;;
+            preview:clip) open_copy_menu "${VISIBLE[CURSOR]}" ;;
+            copy:up) (( COPY_CURSOR > 0 )) && ((COPY_CURSOR--)) ;;
+            copy:down) (( COPY_CURSOR + 1 < ${#COPY_ITEMS[@]} )) && ((COPY_CURSOR++)) ;;
+            copy:enter) copy_selected ;;
+            copy:quit|copy:back) SCREEN=$COPY_RETURN; set_status 'Cópia cancelada.' ;;
+            extensions:quit|extensions:back) SCREEN=$EXT_RETURN; EXT_LINES=() ;;
+            extensions:up) (( EXT_OFFSET > 0 )) && ((EXT_OFFSET--)) ;;
+            extensions:down) (( EXT_OFFSET + BODY_H < ${#EXT_LINES[@]} )) && ((EXT_OFFSET++)) ;;
         esac
     done
 }

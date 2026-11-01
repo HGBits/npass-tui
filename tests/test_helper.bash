@@ -85,8 +85,21 @@ case "$1" in
     exit 0
     ;;
   otp)
+    # `otp clip` copies; plain `otp` (print the code) must never be called by the TUI.
+    if [[ $2 == clip ]]; then
+      if [[ ${MOCK_OTP_FAIL:-0} == 1 ]]; then printf 'FAIL-SECRET-SENTINEL\n'; exit 17; fi
+      exit 0
+    fi
     printf 'OTP-SENTINEL-123456\n'
-    if [[ ${MOCK_OTP_FAIL:-0} == 1 ]]; then printf 'FAIL-SECRET-SENTINEL\n'; exit 17; fi
+    ;;
+  extension)
+    if [[ ${MOCK_EXT_FAIL:-0} == 1 ]]; then printf 'FAIL-SECRET-SENTINEL\n'; exit 17; fi
+    if [[ ${MOCK_EXT_EMPTY:-0} == 1 ]]; then exit 0; fi
+    if [[ ${MOCK_EXT_CONTROL:-0} == 1 ]]; then
+      printf 'safe-ext\033]0;PWNED-EXT\007\033[?9999h\n'
+      exit 0
+    fi
+    printf 'npass-import  1.0\nnpass-audit  1.0\n'
     ;;
   *) printf 'unexpected command: %s\n' "$1" >&2; exit 90 ;;
 esac

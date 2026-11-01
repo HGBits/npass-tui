@@ -32,8 +32,15 @@ VISIBLE=()
 PREVIEW_LINES=()
 PREVIEW_OFFSET=0
 PREVIEW_REVEAL=0     # 1 only after an explicit V; the content is never drawn while 0
-OTP_LINES=()
-OTP_RETURN=entries
+# Copy menu (C): which field of the entry goes to the clipboard.
+COPY_ITEMS=()        # "kind|argument|label"
+COPY_CURSOR=0
+COPY_PATH=''
+COPY_RETURN=entries
+# Extensions screen (X): read-only list from `npass extension list`.
+EXT_LINES=()
+EXT_OFFSET=0
+EXT_RETURN=entries
 ROWS=24
 COLS=80
 

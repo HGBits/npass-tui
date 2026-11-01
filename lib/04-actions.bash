@@ -1,33 +1,78 @@
 # User actions: each delegates secret handling to the npass CLI.
 
-run_action() {
-    local action=$1 path=$2 output rc line
-    case $action in
-        clip)
-            if output=$("$NPASS_BIN" clip "$CURRENT_ID" "$path" 2>&1); then
-                show_message 'Comando npass clip concluído.'
-            else
-                rc=$?
-                show_message "Falha ao copiar (código $rc)."
-            fi
-            return ;;
-        otp)
-            if output=$("$NPASS_BIN" otp "$CURRENT_ID" "$path" 2>&1); then
-                :
-            else
-                rc=$?
-                show_message "Falha ao obter OTP (código $rc)."
-                return
-            fi
-            OTP_LINES=()
-            while IFS= read -r line; do OTP_LINES+=("$line"); done <<< "$output"
-            output=''
-            # The code lives only in OTP_LINES and on the OTP screen, never in the
-            # status line. Any key returns to where the person was (main loop).
-            OTP_RETURN=$SCREEN
-            SCREEN=otp
-            set_status "OTP de $path" ;;
+# What C can copy. "kind|argument|label": pw is the entry password, field passes
+# the name to `npass clip FIELD`, otp is `npass otp clip`, all is the whole
+# document, other asks for a field name.
+COPY_MENU=('pw||Senha' 'field|login|Login' 'field|email|E-mail' 'field|pin|PIN'
+           'otp||Código OTP' 'other||Outro campo...' 'all|all|Documento inteiro')
+
+open_copy_menu() {
+    COPY_ITEMS=("${COPY_MENU[@]}")
+    COPY_CURSOR=0
+    COPY_PATH=$1
+    COPY_RETURN=$SCREEN
+    SCREEN=copy
+}
+
+# The value goes straight from npass to the clipboard: the TUI never sees it,
+# and the CLI's output (which could hold it on failure) is not shown.
+copy_to_clipboard() {
+    local kind=$1 arg=$2 label=$3 path=$4 output rc
+    case $kind in
+        pw) output=$("$NPASS_BIN" clip "$CURRENT_ID" "$path" 2>&1); rc=$? ;;
+        otp) output=$("$NPASS_BIN" otp clip "$CURRENT_ID" "$path" 2>&1); rc=$? ;;
+        *) output=$("$NPASS_BIN" clip "$arg" "$CURRENT_ID" "$path" 2>&1); rc=$? ;;
     esac
+    output=''
+    if (( rc == 0 )); then
+        set_status "Copiado: $label de $path"
+    else
+        set_status "Falha ao copiar (código $rc)."
+    fi
+}
+
+# Enter in the copy menu.
+copy_selected() {
+    local item=${COPY_ITEMS[COPY_CURSOR]} kind arg label rest
+    kind=${item%%|*}
+    rest=${item#*|}
+    arg=${rest%%|*}
+    label=${rest#*|}
+    SCREEN=$COPY_RETURN
+    if [[ $kind == other ]]; then
+        prompt_line 'Nome do campo (vazio cancela): '
+        arg=$REPLY
+        if [[ -z $arg ]]; then
+            set_status 'Cópia cancelada.'
+            return
+        fi
+        # The name becomes an argument of npass: no leading dash, no odd characters.
+        if [[ ! $arg =~ ^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$ ]]; then
+            set_status 'Nome de campo inválido.'
+            return
+        fi
+        label=$arg
+    fi
+    copy_to_clipboard "$kind" "$arg" "$label" "$COPY_PATH"
+}
+
+# Extensions are optional and may be disabled: show what `npass extension list`
+# reports and nothing else. Actions on extensions are future work.
+open_extensions() {
+    local output line rc
+    if output=$("$NPASS_BIN" extension list 2>&1); then
+        :
+    else
+        rc=$?
+        set_status "Extensões indisponíveis (código $rc)."
+        return
+    fi
+    EXT_LINES=()
+    while IFS= read -r line; do [[ -n $line ]] && EXT_LINES+=("$line"); done <<< "$output"
+    (( ${#EXT_LINES[@]} )) || EXT_LINES=('Nenhuma extensão instalada.')
+    EXT_OFFSET=0
+    EXT_RETURN=$SCREEN
+    SCREEN=extensions
 }
 
 open_preview() {

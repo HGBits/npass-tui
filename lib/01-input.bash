@@ -39,7 +39,7 @@ read_key() {
         e|E) REPLY=edit ;;
         d|D) REPLY=delete ;;
         c|C) REPLY=clip ;;
-        o|O) REPLY=otp ;;
+        x|X) REPLY=extensions ;;
         v|V) REPLY=reveal ;;
         /) REPLY=search ;;
         *) REPLY=unknown ;;

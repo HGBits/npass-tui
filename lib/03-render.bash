@@ -118,16 +118,17 @@ footer_keys() {
     local item rest key label best best_i i sep
     local seps=('   ' '  ')
     case $SCREEN in
-        identities) items=("1|$G_UPDN|Navegar" '1|Enter|Abrir' '1|Q|Sair') ;;
+        identities) items=("1|$G_UPDN|Navegar" '1|Enter|Abrir' '2|X|Extensões' '1|Q|Sair') ;;
         entries) items=("1|$G_UPDN|Navegar" '1|Enter|Abrir' '2|/|Filtrar' '3|A|Criar' '3|E|Editar'
-                        '3|D|Excluir' '2|C|Copiar' '2|O|OTP' '1|Esc|Voltar') ;;
+                        '3|D|Excluir' '2|C|Copiar' '3|X|Extensões' '1|Esc|Voltar') ;;
         preview)
             if (( PREVIEW_REVEAL )); then
-                items=('1|V|Ocultar' "2|$G_UPDN|Rolar" '2|C|Copiar' '2|O|OTP' '1|Esc|Voltar')
+                items=('1|V|Ocultar' "2|$G_UPDN|Rolar" '2|C|Copiar' '1|Esc|Voltar')
             else
-                items=('1|V|Revelar' '2|C|Copiar' '2|O|OTP' '1|Esc|Voltar')
+                items=('1|V|Revelar' '2|C|Copiar' '1|Esc|Voltar')
             fi ;;
-        otp) items=('1|Qualquer tecla|Voltar') ;;
+        copy) items=("1|$G_UPDN|Escolher" '1|Enter|Copiar' '1|Esc|Cancelar') ;;
+        extensions) items=("2|$G_UPDN|Rolar" '1|Esc|Voltar') ;;
     esac
     while :; do
         for sep in "${seps[@]}"; do
@@ -156,7 +157,8 @@ draw_header() {
     case $SCREEN in
         entries) where="COFRE / $CURRENT_ID" ;;
         preview) where="COFRE / $CURRENT_ID / ${VISIBLE[CURSOR]-}" ;;
-        otp) where="COFRE / $CURRENT_ID / OTP" ;;
+        copy) where="COFRE / $CURRENT_ID / ${COPY_PATH}" ;;
+        extensions) where='COFRE / EXTENSÕES' ;;
     esac
     paint "$HDR_ROW" 0 "$COLS" " npass-tui  $where" "$BOLD$REV"
     paint "$RULE_TOP" 0 "$COLS" "$RULE_TOP_TXT"
@@ -170,12 +172,14 @@ draw_footer() {
 }
 
 # The Explorer lists identities, or the entries of the current identity once one
-# is open. While a preview/OTP is on the right, the Explorer keeps showing the
-# list but the selection is only bold: the focus is on the right.
+# is open. While something else owns the right pane (preview, copy menu,
+# extensions) the Explorer keeps showing the list but the selection is only
+# bold: the focus is on the right.
 draw_explorer() {
-    local title empty_msg='' i idx row n
+    local title empty_msg='' i idx row n kind=$SCREEN
     local src=IDENTITIES attr_sel=$REV
-    case $SCREEN in
+    [[ $SCREEN == extensions ]] && kind=$EXT_RETURN
+    case $kind in
         identities)
             title='IDENTIDADES'
             empty_msg='Nenhuma identidade. Crie uma com: npass init' ;;
@@ -187,7 +191,7 @@ draw_explorer() {
                 empty_msg='Identidade sem entradas. Pressione a para criar a primeira.'
             fi ;;
     esac
-    [[ $SCREEN == preview || $SCREEN == otp ]] && attr_sel=$BOLD
+    [[ $SCREEN == identities || $SCREEN == entries ]] || attr_sel=$BOLD
     local -n items=$src
     n=${#items[@]}
     clamp_view "$n"
@@ -259,7 +263,7 @@ ctx_entry() {
     ctx_field 'Proteção:' 'conteúdo oculto'
     ctx_add "             Só é lido com Enter."
     ctx_add ''
-    ctx_add 'Enter abrir  C copiar  O OTP'
+    ctx_add 'Enter abrir  C copiar'
     ctx_add 'E editar  D excluir'
 }
 
@@ -277,7 +281,7 @@ draw_context() {
     done
 }
 
-# Scrollable text (preview and OTP) in the right pane.
+# Scrollable text (preview and extensions) in the right pane.
 draw_text() {
     local title=$1 i row
     local -n lines=$2
@@ -291,6 +295,22 @@ draw_text() {
             paint "$row" "$CT_COL" "$CT_W" ''
         fi
     done
+}
+
+draw_copy_menu() {
+    local i item label
+    CTX=() CTX_A=()
+    ctx_add 'O que copiar?' "$BOLD"
+    ctx_add ''
+    for i in "${!COPY_ITEMS[@]}"; do
+        item=${COPY_ITEMS[i]}
+        label=${item##*|}
+        if (( i == COPY_CURSOR )); then ctx_add "> $label" "$REV"; else ctx_add "  $label"; fi
+    done
+    ctx_add ''
+    ctx_add 'O valor vai direto para a área de'
+    ctx_add 'transferência; nada aparece na tela.'
+    draw_context 'COPIAR'
 }
 
 draw_too_small() {
@@ -321,20 +341,23 @@ render() {
                 if [[ $SCREEN == identities ]]; then ctx_identity; else ctx_entry; fi
                 draw_context 'CONTEXTO'
             fi ;;
-        preview | otp)
+        preview | copy | extensions)
             (( SPLIT )) && draw_explorer
-            if [[ $SCREEN == preview && $PREVIEW_REVEAL == 1 ]]; then
-                draw_text 'CONTEÚDO  [revelado]' PREVIEW_LINES "$PREVIEW_OFFSET"
-            elif [[ $SCREEN == preview ]]; then
-                # Hidden: not a single line of the content is drawn.
-                CTX=() CTX_A=()
-                ctx_add 'Conteúdo protegido.' "$BOLD"
-                ctx_add ''
-                ctx_add 'Pressione V para revelar.'
-                draw_context 'CONTEÚDO  [oculto]'
-            else
-                draw_text 'CÓDIGO OTP' OTP_LINES 0
-            fi ;;
+            case $SCREEN in
+                preview)
+                    if (( PREVIEW_REVEAL )); then
+                        draw_text 'CONTEÚDO  [revelado]' PREVIEW_LINES "$PREVIEW_OFFSET"
+                    else
+                        # Hidden: not a single line of the content is drawn.
+                        CTX=() CTX_A=()
+                        ctx_add 'Conteúdo protegido.' "$BOLD"
+                        ctx_add ''
+                        ctx_add 'Pressione V para revelar.'
+                        draw_context 'CONTEÚDO  [oculto]'
+                    fi ;;
+                copy) draw_copy_menu ;;
+                extensions) draw_text 'EXTENSÕES' EXT_LINES "$EXT_OFFSET" ;;
+            esac ;;
     esac
     draw_separator
     draw_footer

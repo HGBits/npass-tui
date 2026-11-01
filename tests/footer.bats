@@ -11,13 +11,13 @@ load test_helper
   [ "$status" -eq 0 ]
 }
 
-@test "preview: rodapé mostra só rolagem, cópia, OTP e voltar" {
+@test "preview: rodapé mostra só revelar, rolagem, cópia e voltar" {
   run_tui_case footer-preview
   [ "$status" -eq 0 ]
 }
 
-@test "OTP: rodapé próprio e o código sai da tela ao voltar" {
-  run_tui_case footer-otp
+@test "menu de cópia: rodapé próprio e o menu sai da tela ao cancelar" {
+  run_tui_case copy-menu-layout
   [ "$status" -eq 0 ]
 }
 

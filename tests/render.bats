@@ -26,7 +26,7 @@ load test_helper
 @test "terminal pequeno demais: mensagem clara e nenhuma ação é disparada às cegas" {
   PTY_ROWS=8 PTY_COLS=30 run_tui_case render-too-small
   [ "$status" -eq 0 ]
-  for cmd in rm edit insert clip otp show ls; do
+  for cmd in rm edit insert clip otp show ls extension; do
     run grep -Eq "^$cmd " "$LOG"
     [ "$status" -ne 0 ]
   done

@@ -266,9 +266,11 @@ def sc_path_spaces(s):
     open_identity(s)
     s.read_until("dir with spaces/login entry")
     s.send("c")
-    s.wait_text("Comando npass clip concluído.", FOOT_ENTRIES)
+    s.wait_text("O que copiar?")
+    s.send("\r")
+    s.wait_text("Copiado: Senha de dir with spaces/login entry", FOOT_ENTRIES)
     # The status message lasts until the next key; an unknown key just clears it.
-    s.send("x")
+    s.send("z")
     wait_entries(s)
     quit_tui(s)
 
@@ -366,7 +368,7 @@ def sc_show_fail_secret(s):
     s.wait_text("Erro ao abrir entrada (código 17)")
     if s.raw_has(FAIL_SENTINEL):
         raise Fail("preview failure output leaked into the terminal")
-    s.send("x")
+    s.send("z")
     wait_entries(s)
     quit_tui(s)
 
@@ -375,38 +377,13 @@ def sc_clip_fail_secret(s):
     open_identity(s)
     s.read_until("example/login")
     s.send("c")
+    s.wait_text("O que copiar?")
+    s.send("\r")
     s.wait_text("Falha ao copiar (código 17)")
     if s.raw_has(FAIL_SENTINEL):
         raise Fail("clipboard failure output leaked into the terminal")
-    s.send("x")
+    s.send("z")
     wait_entries(s)
-    quit_tui(s)
-
-
-def sc_otp_fail_secret(s):
-    open_identity(s)
-    s.read_until("example/login")
-    s.send("o")
-    s.wait_text("Falha ao obter OTP (código 17)")
-    if s.raw_has(FAIL_SENTINEL) or s.raw_has(SECRET_OTP):
-        raise Fail("OTP failure output leaked into the terminal")
-    s.send("x")
-    wait_entries(s)
-    quit_tui(s)
-
-
-def sc_otp_secret(s):
-    open_identity(s)
-    s.read_until("example/login")
-    s.send("o")
-    s.wait_text(SECRET_OTP, "OTP de example/login")
-    status_row = next(r for r in range(s.rows) if "OTP de example/login" in s.screen.line(r))
-    if SECRET_OTP in s.screen.line(status_row):
-        raise Fail("OTP value appeared in the TUI status text")
-    s.send("q")
-    wait_entries(s)
-    if s.screen.has(SECRET_OTP):
-        raise Fail("OTP value stayed on screen after leaving the OTP view")
     quit_tui(s)
 
 
@@ -446,9 +423,9 @@ def need(cond, msg):
 def sc_footer_identities(s):
     wait_identities(s)
     foot = last_row(s)
-    for key in ("↑↓ Navegar", "Enter Abrir", "Q Sair"):
+    for key in ("↑↓ Navegar", "Enter Abrir", "X Extensões", "Q Sair"):
         need(key in foot, "rodapé de identidades sem %r: %r" % (key, foot))
-    for key in ("Excluir", "Filtrar", "Criar", "Editar", "OTP"):
+    for key in ("Excluir", "Filtrar", "Criar", "Editar", "OTP", "Copiar"):
         need(key not in foot, "rodapé de identidades mostra atalho inaplicável %r" % key)
     need(status_row(s) == "", "linha de status deveria estar vazia: %r" % status_row(s))
     need(count(s, "Navegar") == 1, "atalhos duplicados na tela")
@@ -461,11 +438,12 @@ def sc_footer_entries(s):
     wait_entries(s)
     foot = last_row(s)
     for key in ("↑↓ Navegar", "Enter Abrir", "/ Filtrar", "A Criar", "E Editar",
-                "D Excluir", "C Copiar", "O OTP", "Esc Voltar"):
+                "D Excluir", "C Copiar", "X Extensões", "Esc Voltar"):
         need(key in foot, "rodapé de entradas sem %r: %r" % (key, foot))
     need(status_row(s) == "", "linha de status deveria estar vazia: %r" % status_row(s))
     need(count(s, "Navegar") == 1, "atalhos duplicados na tela")
     need(count(s, "Excluir") == 1, "atalhos duplicados na tela")
+    need("OTP" not in foot, "o atalho O/OTP foi removido: OTP agora está no menu de cópia")
     quit_tui(s)
 
 
@@ -484,18 +462,6 @@ def sc_footer_preview(s):
     need(count(s, "Rolar") == 1 and count(s, "Ocultar") == 1, "atalhos duplicados na tela")
     s.send("q")
     wait_entries(s)
-    quit_tui(s)
-
-
-def sc_footer_otp(s):
-    open_identity(s)
-    wait_entries(s)
-    s.send("o")
-    s.wait_text("CÓDIGO OTP", SECRET_OTP, "Qualquer tecla Voltar")
-    need("Filtrar" not in last_row(s), "rodapé do OTP mostra atalhos de entradas")
-    s.send("x")
-    wait_entries(s)
-    need(not s.screen.has(SECRET_OTP), "OTP continuou na tela depois de voltar")
     quit_tui(s)
 
 
@@ -662,9 +628,9 @@ def sc_render_attrs(s):
     s.wait_text("CONTEÚDO", "V Revelar")
     s.send("q")
     wait_entries(s)
-    s.send("o")
-    s.wait_text(SECRET_OTP)
-    s.send("x")
+    s.send("c")
+    s.wait_text("O que copiar?")
+    s.send("\x1b")
     wait_entries(s)
     need(not s.screen.colors, "a TUI impôs cores (SGR %s); deve herdar as do terminal" % sorted(s.screen.colors))
     need(not s.screen.unknown, "sequências desconhecidas emitidas: %r" % s.screen.unknown)
@@ -838,24 +804,6 @@ def sc_preview_scroll(s):
     quit_tui(s)
 
 
-def sc_preview_otp_return(s):
-    open_identity(s)
-    wait_entries(s)
-    s.send("\r")
-    s.wait_text("[oculto]")
-    s.send("v")
-    s.wait_text(SAFE)
-    s.send("o")
-    s.wait_text("CÓDIGO OTP", SECRET_OTP)
-    need(not s.screen.has(SAFE), "conteúdo e OTP misturados na mesma tela")
-    s.send("x")
-    s.wait_text("CONTEÚDO  [revelado]", SAFE)
-    need(not s.screen.has(SECRET_OTP), "OTP ficou na tela ao voltar")
-    s.send("q")
-    wait_entries(s)
-    quit_tui(s)
-
-
 def sc_preview_keeps_selection(s):
     open_identity(s)
     wait_entries(s)
@@ -900,6 +848,208 @@ def sc_filter(s):
     quit_tui(s)
 
 
+def log_lines():
+    with open(os.environ["NPASS_LOG"], "r", encoding="utf-8") as stream:
+        return stream.read().splitlines()
+
+
+def at_copy_menu(s):
+    open_identity(s)
+    wait_entries(s)
+    s.read_until("example/login")
+    s.send("c")
+    s.wait_text("COPIAR", "O que copiar?", "Enter Copiar")
+
+
+def copy_and_wait(s, status):
+    s.send("\r")
+    s.wait_text(status, FOOT_ENTRIES)
+    s.settle(0.1)
+
+
+def sc_copy_menu_layout(s):
+    at_copy_menu(s)
+    need("> Senha" in s.screen.text(), "Senha deveria ser o item padrão")
+    for label in ("Senha", "Login", "E-mail", "PIN", "Código OTP", "Outro campo...", "Documento inteiro"):
+        need(label in s.screen.text(), "menu de cópia sem %r" % label)
+    foot = last_row(s)
+    for key in ("↑↓ Escolher", "Enter Copiar", "Esc Cancelar"):
+        need(key in foot, "rodapé do menu de cópia sem %r: %r" % (key, foot))
+    need("Filtrar" not in foot and "Excluir" not in foot, "rodapé do menu mostra atalhos de entradas")
+    need([r for r in range(3, s.rows - 3) if "rev" in s.screen.attrs_at(r, 41)] != [], "item selecionado sem reverso")
+    s.send("j")
+    s.wait_text("> Login")
+    need("> Senha" not in s.screen.text(), "seleção antiga ficou na tela")
+    s.send("k")
+    s.wait_text("> Senha")
+    s.send("\x1b")
+    s.wait_text("Cópia cancelada.", FOOT_ENTRIES)
+    need(not s.screen.has("O que copiar?"), "menu ficou na tela depois de cancelar")
+    quit_tui(s)
+
+
+def sc_copy_password(s):
+    at_copy_menu(s)
+    copy_and_wait(s, "Copiado: Senha de example/login")
+    quit_tui(s)
+
+
+def sc_copy_field(s):
+    at_copy_menu(s)
+    s.send("j")
+    s.wait_text("> Login")
+    copy_and_wait(s, "Copiado: Login de example/login")
+    s.send("c")
+    s.wait_text("O que copiar?")
+    s.send("jjj")
+    s.wait_text("> PIN")
+    copy_and_wait(s, "Copiado: PIN de example/login")
+    quit_tui(s)
+
+
+def sc_copy_otp(s):
+    at_copy_menu(s)
+    s.send("jjjj")
+    s.wait_text("> Código OTP")
+    copy_and_wait(s, "Copiado: Código OTP de example/login")
+    need(not s.screen.has(SECRET_OTP) and not s.raw_has(SECRET_OTP), "o código OTP apareceu na tela")
+    quit_tui(s)
+
+
+def sc_copy_all(s):
+    at_copy_menu(s)
+    s.send("jjjjjj")
+    s.wait_text("> Documento inteiro")
+    copy_and_wait(s, "Copiado: Documento inteiro de example/login")
+    quit_tui(s)
+
+
+def sc_copy_other(s):
+    at_copy_menu(s)
+    s.send("jjjjj")
+    s.wait_text("> Outro campo...")
+    s.send("\r")
+    s.read_until("Nome do campo (vazio cancela)")
+    s.send("api-key\n")
+    s.wait_text("Copiado: api-key de example/login", FOOT_ENTRIES)
+    # nome inválido: não chega à CLI
+    s.send("c")
+    s.wait_text("O que copiar?")
+    s.send("jjjjj")
+    s.wait_text("> Outro campo...")
+    s.send("\r")
+    s.read_until("Nome do campo (vazio cancela)", after=s.mark())
+    s.send("--help\n")
+    s.wait_text("Nome de campo inválido.", FOOT_ENTRIES)
+    # vazio cancela
+    s.send("c")
+    s.wait_text("O que copiar?")
+    s.send("jjjjj")
+    s.wait_text("> Outro campo...")
+    s.send("\r")
+    s.read_until("Nome do campo (vazio cancela)", after=s.mark())
+    s.send("\n")
+    s.wait_text("Cópia cancelada.", FOOT_ENTRIES)
+    quit_tui(s)
+
+
+def sc_copy_from_preview(s):
+    open_identity(s)
+    wait_entries(s)
+    s.send("\r")
+    s.wait_text("[oculto]")
+    s.send("v")
+    s.wait_text(SAFE)
+    s.send("c")
+    s.wait_text("COPIAR", "O que copiar?")
+    need(not s.screen.has(SAFE), "conteúdo apareceu no menu de cópia")
+    s.send("\x1b")
+    s.wait_text("CONTEÚDO  [revelado]", SAFE)
+    s.send("c")
+    s.wait_text("O que copiar?")
+    s.send("j\r")
+    s.wait_text("Copiado: Login de example/login", "CONTEÚDO  [revelado]", SAFE)
+    s.send("q")
+    wait_entries(s)
+    quit_tui(s)
+
+
+def sc_copy_otp_fail(s):
+    at_copy_menu(s)
+    s.send("jjjj")
+    s.wait_text("> Código OTP")
+    s.send("\r")
+    s.wait_text("Falha ao copiar (código 17).", FOOT_ENTRIES)
+    s.settle(0.1)
+    need(not s.raw_has(FAIL_SENTINEL) and not s.raw_has(SECRET_OTP), "saída da CLI vazou para a tela")
+    quit_tui(s)
+
+
+def sc_copy_no_otp_key(s):
+    open_identity(s)
+    wait_entries(s)
+    s.read_until("example/login")
+    s.send("o")
+    s.settle(0.2)
+    need(not s.screen.has("OTP"), "a tecla O não deveria fazer nada")
+    need(selected_rows(s.screen) == [3] and s.screen.has("ENTRADAS"), "a tela mudou com a tecla O")
+    quit_tui(s)
+
+
+def sc_extensions(s):
+    open_identity(s)
+    wait_entries(s)
+    s.send("x")
+    s.wait_text("EXTENSÕES", "npass-import", "npass-audit", "Esc Voltar")
+    need("COFRE / EXTENSÕES" in s.screen.line(0), "cabeçalho da tela de extensões")
+    need(not s.screen.overflow and not s.screen.scrolled, "tela rolou ou passou da coluna")
+    s.send("\x1b")
+    wait_entries(s)
+    need(not s.screen.has("npass-import"), "lista de extensões ficou na tela")
+    s.send("q")
+    wait_identities(s)
+    s.send("x")
+    s.wait_text("EXTENSÕES", "npass-import")
+    need("IDENTIDADES" in s.screen.text(), "Explorer deveria continuar mostrando as identidades")
+    s.send("q")
+    wait_identities(s)
+    s.send("q")
+    check_clean_exit(s, "extensions")
+
+
+def sc_extensions_fail(s):
+    wait_identities(s)
+    s.send("x")
+    s.wait_text("Extensões indisponíveis (código 17).")
+    s.settle(0.1)
+    need(not s.raw_has(FAIL_SENTINEL), "saída de erro da CLI vazou para a tela")
+    need(s.screen.has("IDENTIDADES") and not s.screen.has("EXTENSÕES"), "deveria continuar nas identidades")
+    s.send("q")
+    check_clean_exit(s, "extensions-fail")
+
+
+def sc_extensions_empty(s):
+    wait_identities(s)
+    s.send("x")
+    s.wait_text("EXTENSÕES", "Nenhuma extensão instalada.")
+    s.send("q")
+    wait_identities(s)
+    s.send("q")
+    check_clean_exit(s, "extensions-empty")
+
+
+def sc_extensions_control(s):
+    wait_identities(s)
+    s.send("x")
+    s.wait_text("EXTENSÕES", "safe-ext")
+    s.settle(0.1)
+    need(not s.raw_has("PWNED-EXT") and not s.raw_has("\x1b[?9999h"), "sequência de controle da CLI chegou ao terminal")
+    s.send("q")
+    wait_identities(s)
+    s.send("q")
+    check_clean_exit(s, "extensions-control")
+
+
 def cursor_pos(screen):
     m = re.search(r"ENTRADAS\s+(\d+)/", screen.text())
     return int(m.group(1)) if m else -1
@@ -928,9 +1078,21 @@ def sc_input_no_loss(s):
 
 SCENARIOS = {
     "input-no-loss": sc_input_no_loss,
+    "copy-menu-layout": sc_copy_menu_layout,
+    "copy-password": sc_copy_password,
+    "copy-field": sc_copy_field,
+    "copy-otp": sc_copy_otp,
+    "copy-otp-fail": sc_copy_otp_fail,
+    "copy-all": sc_copy_all,
+    "copy-other": sc_copy_other,
+    "copy-from-preview": sc_copy_from_preview,
+    "copy-no-otp-key": sc_copy_no_otp_key,
+    "extensions": sc_extensions,
+    "extensions-fail": sc_extensions_fail,
+    "extensions-empty": sc_extensions_empty,
+    "extensions-control": sc_extensions_control,
     "preview-protected": sc_preview_protected,
     "preview-scroll": sc_preview_scroll,
-    "preview-otp-return": sc_preview_otp_return,
     "preview-keeps-selection": sc_preview_keeps_selection,
     "filter": sc_filter,
     "layout-split": sc_layout_split,
@@ -949,7 +1111,6 @@ SCENARIOS = {
     "footer-identities": sc_footer_identities,
     "footer-entries": sc_footer_entries,
     "footer-preview": sc_footer_preview,
-    "footer-otp": sc_footer_otp,
     "footer-narrow": sc_footer_narrow,
     "status-replace": sc_status_replace,
     "status-transient": sc_status_transient,
@@ -971,8 +1132,6 @@ SCENARIOS = {
     "delete-control": sc_delete_control,
     "show-fail-secret": sc_show_fail_secret,
     "clip-fail-secret": sc_clip_fail_secret,
-    "otp-fail-secret": sc_otp_fail_secret,
-    "otp-secret": sc_otp_secret,
     "control-output": sc_control_output,
 }
 

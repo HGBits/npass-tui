@@ -125,3 +125,8 @@ A lista é um plano de trabalho, não uma afirmação de que todos os comandos d
 - [ ] Largura real de caracteres de largura dupla (CJK/emoji) em caminhos; hoje só há contagem por caractere.
 - [ ] Rolagem horizontal ou quebra de linhas longas no preview (hoje terminam em reticências).
 - [ ] Validar manualmente em terminais reais (foot, kitty, alacritty, tty do Linux) o piscar, o redimensionamento e o fallback ASCII; os testes usam um emulador mínimo.
+- [x] Menu de cópia por campo (senha, login, e-mail, PIN, OTP, campo livre, documento inteiro); a exibição do código OTP na tela foi removida (`tests/copy.bats`).
+- [x] Tela de Extensões somente leitura (`npass extension list`), ponto de encaixe para ações futuras (`tests/extensions.bats`).
+- [ ] Menu de cópia com os campos reais da entrada (hoje a lista é fixa; exigiria ler os nomes dos campos do documento decifrado).
+- [ ] Ações sobre extensões (instalar, assinar, executar) a partir da tela de Extensões.
+- [x] Leitura de teclado sem timeout e redimensionamento ao vivo por vigia de SIGWINCH (`tests/input.bats`).

@@ -79,7 +79,7 @@ NPASS_BIN="$HOME/.local/bin/npass" ./bin/npass-tui
                                         │ Posição:     3 de 12
 ────────────────────────────────────────┴─────────────────────────────
  mensagem transitória (status)
- ↑↓ Navegar  Enter Abrir  / Filtrar  A Criar  E Editar  D Excluir ...
+ ↑↓ Navegar  Enter Abrir  / Filtrar  A Criar  E Editar  D Excluir  C Copiar ...
 ```
 
 - **Explorer** (esquerda, ~40%): identidades ou entradas, com posição/total e filtro.
@@ -96,8 +96,12 @@ NPASS_BIN="$HOME/.local/bin/npass" ./bin/npass-tui
 - `Enter`: abrir identidade; abrir entrada (executa `npass show --raw`, mas o conteúdo abre **oculto**)
 - `v`: revelar/ocultar o conteúdo no preview
 - `/`: filtrar caminhos; filtro vazio mostra tudo
-- `c`: copiar senha via `npass clip`
-- `o`: consultar OTP via `npass otp`; qualquer tecla volta
+- `c`: menu de cópia; escolha o que vai para a área de transferência (`Enter` copia, `Esc` cancela). O valor nunca passa pela tela:
+  - **Senha** (`npass clip ID CAMINHO`), **Login**, **E-mail**, **PIN** (`npass clip CAMPO ID CAMINHO`)
+  - **Código OTP** (`npass otp clip ID CAMINHO`)
+  - **Outro campo...** pergunta o nome (letras, números, `_`, `.`, `-`; sem `-` no início)
+  - **Documento inteiro** (`npass clip all ID CAMINHO`)
+- `x`: Extensões; lista somente leitura de `npass extension list`. Ações sobre extensões ainda não existem; a tela é o ponto de encaixe para elas
 - `a`: criar entrada, informando o caminho; o próprio `npass insert` solicita a senha duas vezes sem eco e confirma antes de sobrescrever
 - `e`: editar a entrada selecionada com `npass edit` e o editor definido em `$EDITOR`
 - `d`: excluir a entrada selecionada; exige digitar `sim`, avisa sobre anexos de backup e mantém a confirmação nativa do `npass rm`
@@ -114,4 +118,4 @@ NPASS_BIN="$HOME/.local/bin/npass" ./bin/npass-tui
 
 ## Estado
 
-Navegação por identidades e caminhos em Split View com renderização incremental, preview protegido com scroll, filtro simples, clipboard e OTP. A implementação ainda precisa ser validada manualmente contra um cofre real em diferentes terminais.
+Navegação por identidades e caminhos em Split View com renderização incremental, preview protegido com scroll, filtro simples, menu de cópia por campo (inclui OTP) e tela de extensões. A implementação ainda precisa ser validada manualmente contra um cofre real em diferentes terminais.

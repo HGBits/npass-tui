@@ -13,9 +13,10 @@ load test_helper
   [ "$status" -eq 0 ]
 }
 
-@test "OTP aberto de dentro do preview volta ao preview intacto" {
-  MOCK_SHOW_CONTROL=1 run_tui_case preview-otp-return
+@test "menu de cópia aberto de dentro do preview volta ao preview intacto" {
+  MOCK_SHOW_CONTROL=1 run_tui_case copy-from-preview
   [ "$status" -eq 0 ]
+  assert_log_has 'clip login personal example/login'
 }
 
 @test "voltar do preview e editar preservam a seleção da lista" {
