@@ -128,6 +128,7 @@ A lista é um plano de trabalho, não uma afirmação de que todos os comandos d
 - [x] Menu de cópia por campo (senha, login, e-mail, PIN, OTP, campo livre, documento inteiro); a exibição do código OTP na tela foi removida (`tests/copy.bats`).
 - [x] Tela de Extensões com descrição e ações para `audit` e `import`; `passkey` fica na CLI (`tests/extensions.bats`).
 - [x] Copiar só dentro da entrada (preview); backend `clip-x11` automático em sessão X11, `NPASS_TUI_CLIP` para forçar (`tests/copy.bats`).
+- [ ] Ação explícita `clip-x11` na tela de extensões: senha/campo/documento, somente com entrada selecionada e X11 ativo; saída da extensão descartada. Testes PTY adicionados; falta executar suíte/CI e validar manualmente em X11.
 - [ ] Menu de cópia com os campos reais da entrada (hoje a lista é fixa; exigiria ler os nomes dos campos do documento decifrado).
 - [x] Formato de `extension list` confirmado em `lib/11-extensions.bash` do core (`nome: ok` / `nome: recusada (motivo)`). Falta usar os cabeçalhos `npass-extension-desc` em vez da tabela fixa de descrições.
 - [ ] Ações de `passkey` na TUI (list, verify) e opções extras do `audit` (prefixo, `-v`) e do `import`.
