@@ -37,13 +37,13 @@ load test_helper
 @test "audit online: pergunta antes e chama npass audit ID" {
   MOCK_AUDIT_ANSWER=s run_tui_case ext-audit
   [ "$status" -eq 0 ]
-  assert_log_has 'audit personal'
+  assert_log_has 'extension audit personal'
 }
 
 @test "audit offline: npass audit ID --offline" {
   MOCK_AUDIT_ANSWER=o run_tui_case ext-audit
   [ "$status" -eq 0 ]
-  assert_log_has 'audit personal --offline'
+  assert_log_has 'extension audit personal --offline'
 }
 
 @test "audit cancelado não executa nada (nada vai para a rede)" {
@@ -67,7 +67,7 @@ load test_helper
 @test "import: formato, arquivo e confirmação; a lista é recarregada depois" {
   run_tui_case ext-import
   [ "$status" -eq 0 ]
-  run grep -Eq '^import bitwarden personal /' "$LOG"
+  run grep -Eq '^extension import bitwarden personal /' "$LOG"
   [ "$status" -eq 0 ]
   [ "$(grep -Ec '^ls ' "$LOG")" -ge 2 ]
 }
@@ -105,22 +105,22 @@ load test_helper
 @test "clip-x11 na tela de extensões copia a senha sem exibir o conteúdo" {
   MOCK_SESSION=x11 MOCK_DISPLAY=:99 MOCK_CLIP_ANSWER= run_tui_case ext-clip-x11
   [ "$status" -eq 0 ]
-  assert_log_has 'clip-x11 personal example/login'
+  assert_log_has 'extension clip-x11 personal example/login'
 }
 
 @test "clip-x11 aceita campo específico e documento inteiro" {
   MOCK_SESSION=x11 MOCK_DISPLAY=:99 MOCK_CLIP_ANSWER=login run_tui_case ext-clip-x11
   [ "$status" -eq 0 ]
-  assert_log_has 'clip-x11 login personal example/login'
+  assert_log_has 'extension clip-x11 login personal example/login'
   MOCK_SESSION=x11 MOCK_DISPLAY=:99 MOCK_CLIP_ANSWER=all run_tui_case ext-clip-x11
   [ "$status" -eq 0 ]
-  assert_log_has 'clip-x11 all personal example/login'
+  assert_log_has 'extension clip-x11 all personal example/login'
 }
 
 @test "clip-x11 não executa fora de uma sessão X11" {
   MOCK_SESSION=wayland run_tui_case ext-clip-x11-no-session
   [ "$status" -eq 0 ]
-  run grep -Eq '^clip-x11' "$LOG"
+  run grep -Eq '^extension clip-x11' "$LOG"
   [ "$status" -ne 0 ]
 }
 
@@ -150,4 +150,12 @@ load test_helper
   [ "$status" -eq 0 ]
   run grep -Eq '^clip-x11' "$LOG"
   [ "$status" -ne 0 ]
+}
+
+@test "TUI rejeita nomes de artefato com prefixo npass- duplicado" {
+  MOCK_EXT_PREFIXED=1 run_tui_case extensions
+  [ "$status" -eq 0 ]
+  run bash -c "source '$ROOT/lib/00-core.bash' 2>/dev/null; source '$ROOT/lib/05-extensions.bash'; NPASS_BIN='$MOCK_NPASS' NPASS_LOG=/dev/null MOCK_EXT_PREFIXED=1 ext_load; printf '%s' "\${EXT_NAMES[*]}""
+  [ "$status" -eq 0 ]
+  [ "$output" = "" ]
 }
