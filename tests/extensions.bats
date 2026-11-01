@@ -144,3 +144,10 @@ load test_helper
   run grep -Fq 'FAIL-SECRET-SENTINEL' "$PTY_OUT"
   [ "$status" -ne 0 ]
 }
+
+@test "clip-x11 não executa sem uma entrada selecionada" {
+  MOCK_SESSION=x11 MOCK_DISPLAY=:99 run_tui_case ext-clip-x11-without-entry
+  [ "$status" -eq 0 ]
+  run grep -Eq '^clip-x11' "$LOG"
+  [ "$status" -ne 0 ]
+}
