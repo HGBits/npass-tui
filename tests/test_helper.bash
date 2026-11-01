@@ -143,6 +143,8 @@ run_tui() {
     MOCK_OTP_FAIL="${MOCK_OTP_FAIL:-0}" \
     MOCK_ACTION_EXIT="${MOCK_ACTION_EXIT:-0}" \
     MOCK_VERSION="${MOCK_VERSION:-2.8}" \
+    XDG_SESSION_TYPE="${MOCK_SESSION:-wayland}" DISPLAY="${MOCK_DISPLAY:-}" \
+    MOCK_CLIP_ANSWER="${MOCK_CLIP_ANSWER:-}" \
     python3 "$ROOT/tests/pty_driver.py" "$scenario" "$TUI" \
     >"$PTY_OUT" 2>&1; then
     cat "$PTY_OUT" >&2
