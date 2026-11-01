@@ -15,10 +15,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install --yes bats
       - name: Build bin/npass-tui
-        run: bash build.sh --no-sign
+        run: bash release.sh --no-sign
       - name: Check Bash syntax
         run: |
-          bash -n build.sh
+          bash -n release.sh
           bash -n bin/npass-tui
           bash -n tests/test_helper.bash
           python3 -m py_compile tests/pty_driver.py tests/vt.py
