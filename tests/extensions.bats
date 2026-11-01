@@ -49,7 +49,7 @@ load test_helper
 @test "audit cancelado não executa nada (nada vai para a rede)" {
   MOCK_AUDIT_ANSWER= run_tui_case ext-audit
   [ "$status" -eq 0 ]
-  run grep -Eq '^audit' "$LOG"
+  run grep -Eq '^extension audit' "$LOG"
   [ "$status" -ne 0 ]
 }
 
@@ -61,7 +61,7 @@ load test_helper
 @test "audit usa a identidade selecionada quando aberto pela lista de identidades" {
   MOCK_TWO_IDS=1 run_tui_case ext-audit-identity
   [ "$status" -eq 0 ]
-  assert_log_has 'audit work --offline'
+  assert_log_has 'extension audit work --offline'
 }
 
 @test "import: formato, arquivo e confirmação; a lista é recarregada depois" {
@@ -75,14 +75,14 @@ load test_helper
 @test "import recusa formato/arquivo inválidos e sem confirmação não executa" {
   run_tui_case ext-import-invalid
   [ "$status" -eq 0 ]
-  run grep -Eq '^import' "$LOG"
+  run grep -Eq '^extension import' "$LOG"
   [ "$status" -ne 0 ]
 }
 
 @test "extensão recusada pelo npass aparece com o motivo e não é executada" {
   MOCK_EXT_REFUSED=1 run_tui_case extensions-refused
   [ "$status" -eq 0 ]
-  run grep -Eq '^(audit|import|clip-x11)' "$LOG"
+  run grep -Eq '^extension (audit|import|clip-x11)' "$LOG"
   [ "$status" -ne 0 ]
 }
 
@@ -127,14 +127,14 @@ load test_helper
 @test "clip-x11 recusa nome de campo inválido sem chamar a extensão" {
   MOCK_SESSION=x11 MOCK_DISPLAY=:99 MOCK_CLIP_ANSWER=--help run_tui_case ext-clip-x11
   [ "$status" -eq 0 ]
-  run grep -Eq '^clip-x11' "$LOG"
+  run grep -Eq '^extension clip-x11' "$LOG"
   [ "$status" -ne 0 ]
 }
 
 @test "clip-x11 recusada pelo npass nunca é executada pela ação explícita" {
   MOCK_SESSION=x11 MOCK_DISPLAY=:99 MOCK_EXT_REFUSED=1 run_tui_case ext-clip-x11-refused
   [ "$status" -eq 0 ]
-  run grep -Eq '^clip-x11' "$LOG"
+  run grep -Eq '^extension clip-x11' "$LOG"
   [ "$status" -ne 0 ]
 }
 
@@ -148,7 +148,7 @@ load test_helper
 @test "clip-x11 não executa sem uma entrada selecionada" {
   MOCK_SESSION=x11 MOCK_DISPLAY=:99 run_tui_case ext-clip-x11-without-entry
   [ "$status" -eq 0 ]
-  run grep -Eq '^clip-x11' "$LOG"
+  run grep -Eq '^extension clip-x11' "$LOG"
   [ "$status" -ne 0 ]
 }
 
