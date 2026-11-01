@@ -36,7 +36,7 @@ declare -A EXT_DESC=(
 declare -A EXT_USE=(
     [audit]='Enter audita a identidade selecionada.'
     [import]='Enter importa um arquivo para a identidade selecionada.'
-    [passkey]='Sem ação na TUI. Use na CLI: npass extension passkey.'
+    [passkey]='Sem ação na TUI. Use na CLI: npass passkey.'
     [clip-x11]='Enter copia a senha ou um campo da entrada selecionada via xclip (X11).'
     [wclip]='Usada pelo menu Copiar com NPASS_TUI_CLIP=wclip, sem ação aqui.'
 )
@@ -165,8 +165,8 @@ ext_audit() {
     local id=$1 rc
     prompt_line "Auditar $id [s = HIBP online / o = offline / Enter cancela]: "
     case $REPLY in
-        s | S) run_external extension audit "$id"; rc=$? ;;
-        o | O) run_external extension audit "$id" --offline; rc=$? ;;
+        s | S) run_external audit "$id"; rc=$? ;;
+        o | O) run_external audit "$id" --offline; rc=$? ;;
         *) set_status 'Auditoria cancelada.'; return ;;
     esac
     if (( rc == 0 )); then set_status "Auditoria de $id concluída."; else set_status "npass audit falhou (código $rc)."; fi
@@ -200,10 +200,10 @@ ext_clip_x11() {
     [[ $field == all ]] && label='documento'
     [[ -n $field && $field != all ]] && label="campo $field"
     if [[ -n $field ]]; then
-        output=$("$NPASS_BIN" extension clip-x11 "$field" "$id" "$path" 2>&1)
+        output=$("$NPASS_BIN" xclip "$field" "$id" "$path" 2>&1)
         rc=$?
     else
-        output=$("$NPASS_BIN" extension clip-x11 "$id" "$path" 2>&1)
+        output=$("$NPASS_BIN" xclip "$id" "$path" 2>&1)
         rc=$?
     fi
     output=''
@@ -240,7 +240,7 @@ ext_import() {
         set_status 'Importação cancelada.'
         return
     fi
-    run_external extension import "$format" "$id" "$file"
+    run_external import "$format" "$id" "$file"
     rc=$?
     ext_reload
     if (( rc == 0 )); then set_status "Importação concluída em $id."; else set_status "npass import falhou (código $rc)."; fi
