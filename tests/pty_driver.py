@@ -1167,7 +1167,7 @@ def sc_ext_no_action(s):
     s.send("jjjj")
     s.wait_text("> passkey")
     s.send("\r")
-    s.wait_text("Sem ação na TUI. Use na CLI: npass passkey.")
+    s.wait_text("Sem ação na TUI. Use na CLI: npass extension passkey.")
     s.send("q")
     wait_entries(s)
     quit_tui(s)
